@@ -779,30 +779,30 @@ def rate(rows, refs):
     facts = [r for r in checked if r["kind"] == "fatto"]
     conclusions = [r for r in checked if r["kind"] == "conclusione"]
 
-    # 1 stella: un fatto di base è chiaramente falso e implausibile
-    for r in facts:
-        if world(r) < 0.15:
-            return 1, f"fatto falso: «{r['text']}»"
-    # 1 stella: più fatti contraddetti dalle fonti (problema sistemico, non un singolo errore isolato)
+    # Fatti gravemente problematici: implausibili secondo Jev, contraddetti dalle fonti,
+    # con numeri alterati, o citati solo da fonti irraggiungibili e implausibili.
+    # Una singola bandierina rossa può essere un errore isolato di giudizio (il modello non
+    # conosce un evento recente, un estratto è ambiguo): serve un pattern per bocciare tutto
+    # l'articolo a 1 stella; un singolo caso scende comunque a 2.
+    very_implausible = [r for r in facts if world(r) < 0.15]
     contradicted = [r for r in facts if r["verdict"] == "Contraddetta" and world(r) < 0.5]
-    if len(contradicted) >= 2:
-        return 1, f"più fatti contraddetti dalle fonti, tra cui: «{contradicted[0]['text']}»"
-    # 1 stella: più numeri (date, quantità, misure) diversi da quelli riportati dalle fonti,
-    # e non abbastanza noti perché Jev possa dirlo da solo
     altered_numbers = [r for r in facts
                         if r.get("number_match") is not None and r["number_match"] < 0.35 and world(r) < 0.65]
-    if len(altered_numbers) >= 2:
-        return 1, f"più numeri alterati rispetto alle fonti, tra cui: «{altered_numbers[0]['text']}»"
-    # 1 stella: un fatto implausibile appoggiato solo a fonti irraggiungibili (citazione inventata)
-    for r in checked:
-        if only_unreachable(r) and world(r) < 0.3:
-            return 1, f"affermazione implausibile citata da una fonte irraggiungibile: «{r['text']}»"
+    unreachable_implausible = [r for r in checked if only_unreachable(r) and world(r) < 0.3]
 
-    # 2 stelle: un singolo fatto contraddetto o un numero alterato, isolato, o conclusioni non giustificate
-    if contradicted:
-        return 2, f"fatto contraddetto dalle fonti: «{contradicted[0]['text']}»"
-    if altered_numbers:
-        return 2, f"numero alterato rispetto alla fonte: «{altered_numbers[0]['text']}»"
+    seen, serious = set(), []
+    for group in (very_implausible, contradicted, altered_numbers, unreachable_implausible):
+        for r in group:
+            if id(r) not in seen:
+                seen.add(id(r))
+                serious.append(r)
+
+    # 1 stella: più fatti gravemente problematici (problema sistemico, non un singolo errore isolato)
+    if len(serious) >= 2:
+        return 1, f"più fatti gravemente problematici, tra cui: «{serious[0]['text']}»"
+    # 2 stelle: un singolo fatto problematico isolato, o conclusioni non giustificate
+    if serious:
+        return 2, f"fatto problematico, ma isolato: «{serious[0]['text']}»"
     for r in conclusions:
         if r["verdict"] in ("Esagerata", "Contraddetta") or (r["verdict"] in UNVERIFIED and world(r) < 0.5) or world(r) < 0.15:
             return 2, f"conclusione non giustificata dalle fonti: «{r['text']}»"

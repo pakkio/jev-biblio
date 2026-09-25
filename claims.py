@@ -786,8 +786,13 @@ def rate(rows, refs):
     # l'articolo a 1 stella; un singolo caso scende comunque a 2.
     very_implausible = [r for r in facts if world(r) < 0.15]
     contradicted = [r for r in facts if r["verdict"] == "Contraddetta" and world(r) < 0.5]
+    # Il segnale "numeri" risponde "no" sia quando la fonte riporta un numero diverso sia
+    # quando semplicemente non tratta quel dato: contarlo qui richiede che il verdetto indichi
+    # un disaccordo reale con la fonte, non solo la sua assenza (altrimenti è lo stesso segnale
+    # debole di "Non trovata" contato due volte).
     altered_numbers = [r for r in facts
-                        if r.get("number_match") is not None and r["number_match"] < 0.35 and world(r) < 0.65]
+                        if r.get("number_match") is not None and r["number_match"] < 0.35 and world(r) < 0.65
+                        and r["verdict"] not in UNVERIFIED]
     unreachable_implausible = [r for r in checked if only_unreachable(r) and world(r) < 0.3]
 
     seen, serious = set(), []

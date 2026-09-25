@@ -3,13 +3,13 @@
 Dashboard web locale che controlla se un articolo è davvero sostenuto dalle sue fonti:
 
 - **verifica i link** della bibliografia e **scarica il testo delle fonti**;
-- **estrae le affermazioni** dell'articolo con un LLM, separando fatti, opinioni ed esperienze personali;
-- **verifica ogni fatto sul testo delle fonti con [Jev](https://typesafe.ai)** (TypeSafe *System One*): sostenuto, parzialmente sostenuto, esagerato, contraddetto o non trovato;
+- **estrae le affermazioni** dell'articolo con un LLM, separando fatti, conclusioni dell'autore, opinioni ed esperienze personali;
+- **verifica ogni affermazione sul testo delle fonti con [Jev](https://typesafe.ai)** (TypeSafe *System One*) e ne stima la plausibilità secondo la conoscenza generale;
 - **passa a un LLM che ragiona solo i casi in cui Jev è incerto**;
-- **assegna un voto da 1 a 5 stelle** con Jev e **scrive una giustificazione in italiano**;
+- **assegna da 1 a 5 stelle con regole esplicite** sui verdetti, mostrando il motivo, e **scrive una giustificazione in italiano**;
 - **mostra tempi e costi** di ogni passaggio, con il totale in centesimi.
 
-Una verifica completa costa in media circa **0,2 ¢** e richiede **10-40 secondi**, a seconda della lunghezza dell'articolo.
+Una verifica completa costa in media **0,1-0,2 ¢** e richiede **10-40 secondi**, a seconda della lunghezza dell'articolo. Sul set di test il voto è corretto in 18 articoli su 18 (vedi [Valutazione](#valutazione)).
 
 ## Avvio rapido
 
@@ -38,14 +38,26 @@ Senza `OPENROUTER_API_KEY` la dashboard funziona in modalità ridotta: divide l'
 | Passaggio | Chi lo fa | Cosa succede |
 |---|---|---|
 | 1. Link e fonti | Python | Scarica in parallelo fino a 15 URL, con un tetto complessivo di 8 s, ed estrae i paragrafi di testo. |
-| 2. Estrazione | LLM (`gpt-6-luna`) | Divide l'articolo in affermazioni atomiche: **fatto**, **opinione** o **esperienza** in prima persona. Per ognuna indica le fonti e le parole chiave in italiano e inglese. |
+| 2. Estrazione | LLM (`gpt-6-luna`) | Divide l'articolo in affermazioni atomiche: **fatto**, **conclusione** dell'autore ("quindi", "dimostra che"), **opinione** o **esperienza** in prima persona. Per ognuna indica le fonti e le parole chiave in italiano e inglese. |
 | 3. Estratti | Python | Per ogni fatto sceglie i paragrafi delle fonti che condividono parole chiave e numeri, confrontati per valore: "4.700" corrisponde a "4.7k". |
-| 4. Verifica | Jev, una chiamata per fatto, in parallelo | Decide se gli estratti sostengono l'affermazione e con quale confidenza. |
+| 4. Verifica | Jev, una chiamata per affermazione, in parallelo | Decide se gli estratti sostengono l'affermazione, con quale confidenza, e quanto è plausibile secondo la conoscenza generale. La plausibilità conta quando la fonte manca o non tratta il punto. |
 | 5. Casi incerti | LLM che ragiona (`gpt-6-luna-pro`) | Solo se la confidenza di Jev è sotto l'80%: rilegge affermazione ed estratti e decide, con una frase di motivazione. |
-| 6. Voto | Jev | Valuta pertinenza, aderenza e stelle (domanda `Score`, che restituisce un valore atteso, es. 2,3/5), tenendo conto dei verdetti per affermazione. |
+| 6. Voto | regole + Jev | Le stelle si calcolano con le regole qui sotto. Jev dà anche pertinenza, aderenza e un voto globale (`Score`), mostrati come informazione e usati come riserva se l'articolo non contiene fatti verificabili. |
 | 7. Giustificazione | LLM (`gpt-6-luna`) | Scrive 4-6 frasi in italiano senza cambiare i voti. |
 
-Opinioni ed esperienze personali non vengono verificate e non abbassano il voto. Un'interpretazione presentata come conseguenza delle fonti ("questo dimostra che…") viene invece trattata come fatto da verificare: è lì che si nascondono gli articoli fuorvianti.
+Opinioni ed esperienze personali non vengono verificate e non abbassano il voto. Le conclusioni dell'autore ("questo dimostra che…") invece vengono verificate: è lì che si nascondono gli articoli fuorvianti.
+
+### Regole di voto
+
+Le stelle non sono un giudizio complessivo "a sensazione": si calcolano dai verdetti sulle singole affermazioni, in quest'ordine, e la dashboard mostra la regola che ha deciso.
+
+1. **1★ Molto falso**: un fatto di base è contraddetto dalle fonti e implausibile, oppure è chiaramente falso (plausibilità < 15%), oppure un'affermazione implausibile è citata solo da fonti irraggiungibili (citazione inventata).
+2. **2★ Vero ma fuorviante**: i fatti reggono, ma una conclusione dell'autore è esagerata, contraddetta o implausibile, oppure un fatto implausibile distorce la fonte.
+3. **5★ Ottimo**: almeno 3 affermazioni, tutte pienamente sostenute, e fonti non solo enciclopediche.
+4. **4★ Molto buono**: almeno il 60% delle affermazioni confermato dalle fonti. Un articolo basato solo su Wikipedia arriva al massimo a 4★.
+5. **3★ Buono**: negli altri casi.
+
+La separazione tra premesse e conclusioni è ciò che distingue 1★ da 2★: il voto globale di Jev, da solo, dava 1★ a quasi tutti gli articoli fuorvianti.
 
 ### Verdetti per affermazione
 
@@ -74,26 +86,33 @@ Da 3 stelle in su il risultato è considerato positivo (`rating_good: true`).
 
 ## Valutazione
 
-`eval/` contiene 21 articoli brevi su 7 argomenti (Apollo 11, Marie Curie, Torre di Pisa, Grande muraglia, fotosintesi, Python, telescopio Webb) con fonti reali. Ogni argomento ha una versione corretta (4★ attese), una fuorviante (2★: fatti veri, conclusioni distorte) e una falsa (1★).
+`eval/` contiene due set di articoli brevi con fonti reali (Wikipedia italiana e inglese, NASA, ESA). Ogni argomento ha una versione corretta (4★ attese), una fuorviante (2★: fatti veri, conclusioni distorte) e una falsa (1★).
+
+- **Sviluppo** (`dataset.jsonl`, 21 articoli): Apollo 11, Marie Curie, Torre di Pisa, Grande muraglia, fotosintesi, Python, telescopio Webb. Usato per mettere a punto le regole.
+- **Test** (`test_dataset.jsonl`, 18 articoli): Everest, penicillina, Galileo, Titanic, Colosseo, DNA. Scritto dopo aver fissato le regole e usato una sola volta. Metà degli articoli non ha marcatori `[n]`.
 
 ```bash
-uv run --no-project python eval/build_dataset.py   # rigenera eval/dataset.jsonl
-uv run eval/run_eval.py --workers 4                 # verifica tutto e stampa le metriche
-uv run eval/run_eval.py --only apollo11,curie       # solo alcuni argomenti
+uv run --no-project python eval/build_dataset.py                   # rigenera i due set
+uv run eval/run_eval.py --workers 4                                 # set di sviluppo
+uv run eval/run_eval.py --dataset test_dataset.jsonl --workers 4    # set di test
+uv run eval/run_eval.py --only apollo11,curie                       # solo alcuni argomenti
 ```
 
-Risultati di settembre 2026, confrontati con la versione precedente (solo voto globale di Jev, senza leggere le fonti):
+Risultati di settembre 2026:
 
-| | Solo voto globale | Verifica per affermazione |
-|---|---|---|
-| Stelle esatte | 62% | **71%** |
-| Entro una stella | 100% | 100% |
-| Buono / non buono corretto | 100% | 100% |
-| Errore medio | 0,38 stelle | **0,29 stelle** |
-| Tempo medio | **5 s** | 16,5 s |
-| Costo medio | **0,019 ¢** | 0,196 ¢ |
+| | Voto globale Jev (v1) | Per affermazione, voto Jev (v2) | Per affermazione + regole (v3), sviluppo | v3, **test** |
+|---|---|---|---|---|
+| Stelle esatte | 62% | 71% | 95% | **100%** (18/18) |
+| Entro una stella | 100% | 100% | 100% | 100% |
+| Buono / non buono corretto | 100% | 100% | 100% | 100% |
+| Tempo medio | 5 s | 16,5 s | 14,4 s | 11,2 s |
+| Costo medio | 0,019 ¢ | 0,196 ¢ | 0,202 ¢ | 0,118 ¢ |
 
-**Come leggerli:** le etichette sono state assegnate da chi ha scritto gli articoli e i falsi sono per lo più noti (Aldrin primo sulla Luna, muraglia visibile dalla Luna), quindi Jev li riconosce anche senza leggere le fonti. Il vantaggio della verifica sulle fonti dovrebbe crescere su fatti poco noti, citazioni attribuite alla fonte sbagliata e numeri leggermente alterati, che questo set non contiene ancora. L'errore più frequente è un articolo fuorviante giudicato "molto falso" (3 casi su 7). Il passo successivo è aggiungere articoli reali etichettati da persone.
+**Come leggerli:**
+- **Chi ha scritto le etichette:** entrambi i set sono stati scritti ed etichettati da chi ha sviluppato le regole, con tre categorie nette. Il test su articoli mai visti riduce il rischio di aver adattato le regole ai dati, ma non lo elimina.
+- **Margine statistico:** con 18 articoli, un 100% è compatibile con una precisione reale intorno all'85-90%.
+- **Articoli reali:** quelli veri sono più sfumati (errori isolati in articoli buoni, opinioni mescolate ai fatti) e il confine tra 3★, 4★ e 5★ è meno netto di quello tra falso e fuorviante.
+- **Prossimo passo:** raccogliere articoli reali etichettati da persone.
 
 ## Variabili d'ambiente
 
@@ -132,13 +151,15 @@ Risposta (abbreviata):
   "links": [{"url": "https://…", "status": "200", "active": true}],
   "claims": [
     {"text": "Lo specchio primario di Webb ha un diametro di 6,5 metri.", "kind": "fatto", "refs": ["2"],
-     "verdict": "Sostenuta", "confidence": 1.0, "decided_by": "Jev", "reason": "", "excerpts": {"2": "…"}}
+     "verdict": "Sostenuta", "confidence": 1.0, "world": 0.98, "decided_by": "Jev", "reason": "", "excerpts": {"2": "…"}}
   ],
   "claim_counts": {"Sostenuta": 9, "Esagerata": 3, "Non trovata": 4},
   "relation": "Eccellente",
   "adherence": "Discrepanza parziale",
   "rating": "★★☆☆☆ Vero ma fuorviante",
   "rating_stars": 2,
+  "rating_reason": "conclusione non giustificata dalle fonti: «Il rilevamento di anidride carbonica … significa che Webb ha trovato un forte indizio di vita»",
+  "rating_source": "regole",
   "rating_value": 2.31,
   "rating_confidence": 0.73,
   "rating_good": false,
@@ -170,7 +191,7 @@ In caso di errore la risposta è `{"error": "…"}`.
 - `main.py`: server locale, orchestrazione dei passaggi e pagina HTML (Bootstrap + Bootstrap Icons da CDN).
 - `claims.py`: download delle fonti, estrazione delle affermazioni, scelta degli estratti, verifica con Jev e passaggio al LLM.
 - `llm.py`: chiamate a OpenRouter con catena di riserva, tempi e costi.
-- `eval/`: dataset etichettato e script di valutazione.
+- `eval/`: set di sviluppo e di test etichettati, script di valutazione.
 - `colab_main.py`: versione originale per Google Colab, che legge la chiave dai *Colab Secrets*.
 - `samples/`: articoli e bibliografie di prova.
 
@@ -178,6 +199,6 @@ In caso di errore la risposta è `{"error": "…"}`.
 
 - **Pagine dinamiche:** si legge solo l'HTML statico. Le pagine costruite via JavaScript danno pochi paragrafi, e le affermazioni risultano "Non trovata" anche quando la fonte è corretta (succede con alcune pagine NASA).
 - **Estratti:** la scelta dei paragrafi si basa su parole chiave, non sul significato, quindi a volte il passaggio giusto resta fuori.
-- **Confidenza:** stelle e pertinenza hanno spesso una confidenza del 50-80%, mentre i verdetti sui singoli fatti sono di solito più netti.
+- **Regole semplici:** una sola affermazione giudicata falsa porta a 1★. Un errore di Jev su un fatto isolato può quindi abbassare molto il voto, e il motivo mostrato permette di accorgersene.
 - **Costo e tempo:** la verifica per affermazione costa circa 10 volte il solo voto globale ed è circa 3 volte più lenta.
 - **Connessione:** la pagina carica Bootstrap da CDN, quindi serve internet.

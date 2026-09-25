@@ -113,6 +113,93 @@ TOPICS = {
     },
 }
 
+
+# Set di test: scritto dopo aver fissato le regole di voto, da usare solo per misurare.
+# Metà degli argomenti non usa i marcatori [n] nel testo (li associa il LLM).
+TEST_TOPICS = {
+    "everest": {
+        "bib": "[1] Wikipedia - Everest. https://it.wikipedia.org/wiki/Everest\n"
+               "[2] Wikipedia (en) - Mount Everest. https://en.wikipedia.org/wiki/Mount_Everest",
+        "clean": "L'Everest è la montagna più alta della Terra, con circa 8.849 metri sul livello del mare [1][2]. "
+                 "Si trova nella catena dell'Himalaya, sul confine tra Nepal e Cina [1]. "
+                 "La prima salita documentata fu compiuta il 29 maggio 1953 da Edmund Hillary e Tenzing Norgay [2]. "
+                 "Il nome inglese ricorda il geografo George Everest, mentre in nepalese la montagna è chiamata Sagarmatha [1][2].",
+        "misleading": "Everest, ormai una passeggiata.\n\n"
+                      "L'Everest è alto circa 8.849 metri [1]. Ogni anno centinaia di alpinisti ne raggiungono la vetta [2]: "
+                      "è quindi dimostrato che salire sull'Everest è diventato facile e privo di rischi, alla portata di chiunque.",
+        "false": "L'Everest è alto 9.500 metri e si trova nella cordigliera delle Ande [1]. "
+                 "La prima salita fu compiuta nel 1920 da George Mallory, che tornò in patria da eroe [2].",
+    },
+    "penicillina": {
+        "bib": "[1] Wikipedia - Penicillina. https://it.wikipedia.org/wiki/Penicillina\n"
+               "[2] Wikipedia (en) - Penicillin. https://en.wikipedia.org/wiki/Penicillin",
+        "clean": "La penicillina fu scoperta da Alexander Fleming nel 1928, osservando che una muffa del genere Penicillium "
+                 "impediva la crescita dei batteri [1][2]. Negli anni Quaranta Howard Florey ed Ernst Chain ne svilupparono "
+                 "la produzione come farmaco [2]. Nel 1945 Fleming, Florey e Chain ricevettero il premio Nobel per la medicina [1][2].",
+        "misleading": "Antibiotici: ormai inutili.\n\n"
+                      "La penicillina fu scoperta da Alexander Fleming nel 1928 [1]. Oggi molti batteri sono diventati "
+                      "resistenti alla penicillina [2]: questo significa che gli antibiotici non funzionano più contro "
+                      "nessuna infezione e che non ha più senso usarli.",
+        "false": "La penicillina fu scoperta da Louis Pasteur nel 1850 [1]. "
+                 "È un farmaco antivirale, efficace soprattutto contro l'influenza [2].",
+    },
+    "galileo": {
+        "bib": "[1] Wikipedia - Satelliti medicei. https://it.wikipedia.org/wiki/Satelliti_medicei\n"
+               "[2] Wikipedia (en) - Galilean moons. https://en.wikipedia.org/wiki/Galilean_moons",
+        "clean": "Nel gennaio 1610 Galileo Galilei scoprì quattro satelliti di Giove con il suo telescopio [1][2]. "
+                 "Li chiamò Medicea Sidera in onore della famiglia Medici [1]. "
+                 "Oggi sono noti come satelliti galileiani: Io, Europa, Ganimede e Callisto [2].",
+        "misleading": "Galileo chiude il dibattito.\n\n"
+                      "Nel 1610 Galileo scoprì quattro satelliti che orbitano intorno a Giove [1][2]. "
+                      "Questa scoperta dimostrò definitivamente che la Terra gira intorno al Sole, "
+                      "e da quel momento nessuno scienziato ebbe più dubbi.",
+        "false": "Galileo Galilei scoprì nel 1650 i due satelliti di Marte [1]. "
+                 "Li dedicò alla famiglia Sforza di Milano, che finanziava le sue ricerche [2].",
+    },
+    "titanic": {
+        "bib": "[1] Wikipedia - RMS Titanic. https://it.wikipedia.org/wiki/RMS_Titanic\n"
+               "[2] Wikipedia (en) - Titanic. https://en.wikipedia.org/wiki/Titanic",
+        "clean": "Il Titanic fu costruito nei cantieri Harland and Wolff di Belfast. "
+                 "Durante il viaggio inaugurale da Southampton a New York urtò un iceberg e affondò nella notte "
+                 "tra il 14 e il 15 aprile 1912. Nel naufragio morirono più di 1.500 persone, anche perché "
+                 "le scialuppe di salvataggio non bastavano per tutti.",
+        "misleading": "Il Titanic e l'inganno della tecnologia.\n\n"
+                      "Il Titanic era considerato praticamente inaffondabile e affondò durante il suo primo viaggio, "
+                      "nel 1912. Questo dimostra che la tecnologia moderna rende le navi sempre più pericolose: "
+                      "le navi di oggi sono quindi meno sicure di quelle a vela del passato.",
+        "false": "Il Titanic affondò nel 1915 nel mar Mediterraneo, colpito da un sottomarino tedesco. "
+                 "Grazie alle scialuppe, tutti i passeggeri e l'equipaggio si salvarono.",
+    },
+    "colosseo": {
+        "bib": "[1] Wikipedia - Colosseo. https://it.wikipedia.org/wiki/Colosseo\n"
+               "[2] Wikipedia (en) - Colosseum. https://en.wikipedia.org/wiki/Colosseum",
+        "clean": "Il Colosseo, o Anfiteatro Flavio, fu fatto costruire dall'imperatore Vespasiano e inaugurato "
+                 "da Tito nell'80 d.C. Poteva ospitare decine di migliaia di spettatori, che vi assistevano "
+                 "a combattimenti di gladiatori e cacce ad animali. Nel 2007 è stato inserito tra le nuove "
+                 "sette meraviglie del mondo.",
+        "misleading": "Roma, una città che viveva al Colosseo.\n\n"
+                      "Il Colosseo poteva ospitare decine di migliaia di spettatori e vi si svolgevano combattimenti "
+                      "di gladiatori. Dunque i Romani passavano la maggior parte delle loro giornate a guardare "
+                      "combattimenti, e l'intera economia di Roma si reggeva sugli spettacoli.",
+        "false": "Il Colosseo fu costruito dai Greci nel V secolo a.C. "
+                 "Era usato soprattutto per le corse delle bighe e poteva contenere al massimo mille persone.",
+    },
+    "dna": {
+        "bib": "[1] Wikipedia - Acido desossiribonucleico. https://it.wikipedia.org/wiki/Acido_desossiribonucleico\n"
+               "[2] Wikipedia (en) - DNA. https://en.wikipedia.org/wiki/DNA",
+        "clean": "Il DNA contiene le informazioni genetiche degli organismi viventi. "
+                 "Nel 1953 James Watson e Francis Crick ne descrissero la struttura a doppia elica, basandosi anche "
+                 "sui dati di diffrazione di Rosalind Franklin. Le sue quattro basi azotate sono adenina, timina, "
+                 "citosina e guanina, e si appaiano adenina con timina e citosina con guanina.",
+        "misleading": "Siamo prigionieri dei nostri geni.\n\n"
+                      "Nel 1953 Watson e Crick descrissero la struttura a doppia elica del DNA, che contiene le "
+                      "istruzioni genetiche degli organismi. Questo significa che il carattere e il comportamento "
+                      "di ogni persona sono interamente decisi dai geni e non possono essere cambiati in alcun modo.",
+        "false": "La struttura del DNA fu scoperta da Charles Darwin nel 1859. "
+                 "Il DNA è formato da tre sole basi azotate: adenina, guanina e uracile.",
+    },
+}
+
 EXPECTED = {"clean": 4, "misleading": 2, "false": 1}
 
 
@@ -129,10 +216,19 @@ def main():
         items.append({"id": item_id, "article": (SAMPLES / article).read_text(),
                       "bibliography": (SAMPLES / bibliography).read_text(),
                       "expected_stars": stars, "label_by": "costruito"})
-    with open(HERE / "dataset.jsonl", "w") as f:
+    _write(HERE / "dataset.jsonl", items)
+    _write(HERE / "test_dataset.jsonl", [
+        {"id": f"{topic}-{variant}", "article": data[variant], "bibliography": data["bib"],
+         "expected_stars": stars, "label_by": "costruito"}
+        for topic, data in TEST_TOPICS.items() for variant, stars in EXPECTED.items()
+    ])
+
+
+def _write(path, items):
+    with open(path, "w") as f:
         for item in items:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
-    print(f"{len(items)} articoli scritti in {HERE / 'dataset.jsonl'}")
+    print(f"{len(items)} articoli scritti in {path}")
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from html.parser import HTMLParser
 from urllib.error import HTTPError, URLError
 
-from typesafe_sdk import Choice
+from typesafe_sdk import Choice, Noul
 
 import llm
 
@@ -183,9 +183,11 @@ def extract_claims_llm(article, refs):
         "- riporta ciò che l'articolo afferma, comprese esagerazioni ed errori: non correggerlo e non attenuarlo;\n"
         '- "tipo": "fatto" se è verificabile con una fonte pubblicata (date, numeri, eventi, risultati, attribuzioni); '
         '"esperienza" se è un resoconto in prima persona di ciò che l\'autore ha fatto o osservato, che nessuna fonte pubblicata può verificare; '
-        '"opinione" se è un giudizio, un\'interpretazione o una previsione dichiarata come tale. '
-        'Un\'interpretazione presentata come conseguenza dei fatti o delle fonti ("dimostra che", "significa che", '
-        '"è confermato che") è un "fatto" da verificare;\n'
+        '"conclusione" se è un\'inferenza dell\'autore presentata come conseguenza dei fatti o delle fonti '
+        '("dimostra che", "quindi", "significa che", "è confermato che", "è la prova che"); '
+        '"opinione" se è un giudizio personale o una previsione dichiarata come tale. '
+        'Se dividi una conclusione in più affermazioni atomiche, tutte le parti restano "conclusione", '
+        'comprese le attribuzioni o i fatti che l\'autore presenta come conseguenza ("quindi", "dunque", dopo i due punti);\n'
         '- "fonti": i numeri delle fonti citate con [n] vicino all\'affermazione; se l\'articolo non usa [n], '
         "indica le fonti dell'elenco che trattano l'argomento, altrimenti lascia la lista vuota;\n"
         '- "parole_chiave": 4-8 termini per ritrovare il passaggio nelle fonti, in italiano e in inglese, '
@@ -203,7 +205,8 @@ def extract_claims_llm(article, refs):
             continue
         claims.append({
             "text": text,
-            "kind": {"opin": "opinione", "espe": "esperienza"}.get(str(item.get("tipo", "")).lower()[:4], "fatto"),
+            "kind": {"opin": "opinione", "espe": "esperienza", "conc": "conclusione"}.get(
+                str(item.get("tipo", "")).lower()[:4], "fatto"),
             "refs": [str(r).strip("[] ") for r in item.get("fonti", []) if str(r).strip("[] ") in refs],
             "keywords": [str(k) for k in item.get("parole_chiave", [])][:10],
         })
@@ -293,28 +296,32 @@ def best_excerpt(query, paragraphs, max_chars=EXCERPT_CHARS):
 
 # --- Verifica -----------------------------------------------------------------------------------
 
+WORLD_QUESTION = ("Indipendentemente dagli estratti, l'affermazione è vera secondo le conoscenze storiche "
+                  "e scientifiche consolidate?")
+
+
 def _ask_jev(client, claim, sources):
+    """Una chiamata Jev per affermazione: verdetto sugli estratti (se ci sono) e plausibilità
+    secondo la conoscenza generale, utile quando la fonte manca o non tratta il punto."""
     state = f"AFFERMAZIONE:\n{claim['text']}\n"
     for ref, source in sources.items():
         state += f"\nESTRATTO DELLA FONTE [{ref}] ({source['url']}):\n{source['excerpt'] or '(nessun passaggio pertinente trovato)'}\n"
-    response = client.system_one(
-        state=state,
-        model="jev-latest",
-        questions={
-            "verdict": Choice(
-                instructions="Gli estratti delle fonti citate sostengono l'affermazione?",
-                criteria=VERDICTS,
-            )
-        },
-    )
-    answer = response.answers["verdict"]
-    return {
-        "verdict": answer.choice,
-        "confidence": answer.confidence,
-        "probabilities": answer.probabilities,
+    questions = {"world": Noul(instructions=WORLD_QUESTION)}
+    if sources:
+        questions["verdict"] = Choice(
+            instructions="Gli estratti delle fonti citate sostengono l'affermazione?",
+            criteria=VERDICTS,
+        )
+    response = client.system_one(state=state, model="jev-latest", questions=questions)
+    result = {
+        "world": response.answers["world"].noul,
         "input_tokens": response.usage.input_tokens,
         "output_tokens": response.usage.output_tokens,
     }
+    if sources:
+        answer = response.answers["verdict"]
+        result.update(verdict=answer.choice, confidence=answer.confidence, probabilities=answer.probabilities)
+    return result
 
 
 def _escalate(row):
@@ -359,11 +366,9 @@ def verify_claims(client, claims, refs, pages):
             return {**row, "verdict": OPINION}
         if claim["kind"] == "esperienza":
             return {**row, "verdict": EXPERIENCE}
-        if not claim["refs"]:
-            return {**row, "verdict": NO_SOURCE}
-        if not sources:
-            return {**row, "verdict": UNREACHABLE}
         result = _ask_jev(client, claim, sources)
+        if not sources:
+            return {**row, **result, "verdict": UNREACHABLE if claim["refs"] else NO_SOURCE}
         return {**row, **result, "decided_by": "Jev", "jev_verdict": result["verdict"], "_sources": sources}
 
     start = time.perf_counter()
@@ -380,7 +385,7 @@ def verify_claims(client, claims, refs, pages):
     # Instradamento per confidenza: solo i casi incerti passano al LLM, il più incerto per primo
     escalation = {"model": ESCALATION_MODEL, "calls": 0, "seconds": 0.0, "input_tokens": 0,
                   "output_tokens": 0, "cost_cents": 0.0, "errors": []}
-    uncertain = sorted((r for r in jev_rows if r["confidence"] < ESCALATION_THRESHOLD),
+    uncertain = sorted((r for r in jev_rows if r.get("confidence") is not None and r["confidence"] < ESCALATION_THRESHOLD),
                        key=lambda r: r["confidence"])[:MAX_ESCALATIONS]
     if uncertain and llm.available():
         def escalate(row):
@@ -416,6 +421,10 @@ def summarize(rows):
     for i, row in enumerate(rows, 1):
         conf = f" {row['confidence']:.0%}" if row.get("confidence") is not None else ""
         by = f", deciso da {row['decided_by']}" if row.get("decided_by") == "LLM" else ""
+        if row.get("world") is not None:
+            by += f", plausibilità {row['world']:.0%}"
+        if row["kind"] == "conclusione":
+            by += ", conclusione dell'autore"
         refs = "".join(f"[{r}]" for r in row["refs"])
         lines.append(f"{i}. [{row['verdict']}{conf}{by}] {row['text']} {refs}".rstrip())
     return "\n".join(lines) or "(nessuna affermazione estratta)"
@@ -427,3 +436,59 @@ def counts(rows):
     for row in rows:
         result[row["verdict"]] = result.get(row["verdict"], 0) + 1
     return result
+
+
+# --- Voto finale con regole esplicite ------------------------------------------------------------
+
+SUPPORTED = {"Sostenuta", "Parzialmente sostenuta"}
+UNVERIFIED = {"Non trovata", NO_SOURCE, UNREACHABLE}
+ENCYCLOPEDIC = ("wikipedia.org",)
+
+
+def rate(rows, refs):
+    """Calcola le stelle dai verdetti delle singole affermazioni.
+
+    Restituisce (stelle, motivo) oppure (None, motivo) se non ci sono fatti da valutare."""
+    checked = [r for r in rows if r["kind"] in ("fatto", "conclusione")]
+    if not checked:
+        return None, "nessun fatto verificabile: voto affidato alla valutazione globale di Jev"
+
+    def world(row):
+        return row.get("world", 0.5)
+
+    def only_unreachable(row):
+        return row["verdict"] == UNREACHABLE
+
+    facts = [r for r in checked if r["kind"] == "fatto"]
+    conclusions = [r for r in checked if r["kind"] == "conclusione"]
+
+    # 1 stella: un fatto di base è falso (contraddetto dalle fonti e implausibile, o chiaramente falso)
+    for r in facts:
+        if (r["verdict"] == "Contraddetta" and world(r) < 0.5) or world(r) < 0.15:
+            return 1, f"fatto falso: «{r['text']}»"
+    # 1 stella: un fatto implausibile appoggiato solo a fonti irraggiungibili (citazione inventata)
+    for r in checked:
+        if only_unreachable(r) and world(r) < 0.5:
+            return 1, f"affermazione implausibile citata da una fonte irraggiungibile: «{r['text']}»"
+
+    # 2 stelle: fatti veri, ma conclusioni non giustificate o fonti distorte
+    for r in conclusions:
+        if r["verdict"] in ("Esagerata", "Contraddetta") or (r["verdict"] in UNVERIFIED and world(r) < 0.5) or world(r) < 0.15:
+            return 2, f"conclusione non giustificata dalle fonti: «{r['text']}»"
+    for r in facts:
+        # un fatto che Jev ritiene vero non è una distorsione, anche se l'estratto lo copre solo in parte
+        if r["verdict"] == "Esagerata" and world(r) < 0.5:
+            return 2, f"fonte distorta: «{r['text']}»"
+
+    # 3-5 stelle: quota di affermazioni confermate dalle fonti
+    supported = [r for r in checked if r["verdict"] in SUPPORTED]
+    share = len(supported) / len(checked)
+    cited = {ref for r in checked for ref in r["refs"]}
+    only_encyclopedic = cited and all(any(d in refs.get(ref, {}).get("url", "") for d in ENCYCLOPEDIC) for ref in cited)
+    fully = all(r["verdict"] == "Sostenuta" for r in checked)
+    if fully and len(checked) >= 3 and not only_encyclopedic:
+        return 5, "tutte le affermazioni sono confermate da fonti primarie"
+    if share >= 0.6:
+        note = " (fonti solo enciclopediche: massimo 4 stelle)" if fully and only_encyclopedic else ""
+        return 4, f"{len(supported)} affermazioni su {len(checked)} confermate dalle fonti{note}"
+    return 3, f"solo {len(supported)} affermazioni su {len(checked)} confermate dalle fonti"

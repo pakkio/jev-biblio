@@ -33,9 +33,10 @@ def main_eval():
     parser = argparse.ArgumentParser(description="Valutazione del verificatore sul dataset etichettato")
     parser.add_argument("--only", help="prefissi degli id da includere, separati da virgola")
     parser.add_argument("--workers", type=int, default=3, help="articoli verificati in parallelo")
+    parser.add_argument("--dataset", default="dataset.jsonl", help="file in eval/ (es. test_dataset.jsonl)")
     args = parser.parse_args()
 
-    items = [json.loads(line) for line in open(HERE / "dataset.jsonl")]
+    items = [json.loads(line) for line in open(HERE / args.dataset)]
     if args.only:
         prefixes = tuple(args.only.split(","))
         items = [i for i in items if i["id"].startswith(prefixes)]
@@ -52,16 +53,18 @@ def main_eval():
         confusion[expected - 1][got - 1] += 1
         rows.append({
             "id": item["id"], "expected": expected, "got": got, "value": result["rating_value"],
-            "confidence": result["rating_confidence"], "counts": result["claim_counts"],
+            "confidence": result["rating_confidence"], "counts": result["claim_counts"], "reason": result.get("rating_reason", ""),
             "seconds": round(seconds, 1), "cents": result["metrics"]["total_cents"],
         })
 
-    print(f"\n{'articolo':22} {'atteso':>6} {'ottenuto':>8} {'valore':>6} {'conf':>5} {'tempo':>6} {'costo':>8}  affermazioni")
+    print(f"\n{'articolo':22} {'atteso':>6} {'ottenuto':>8} {'Jev':>6} {'conf':>5} {'tempo':>6} {'costo':>8}  affermazioni")
     for r in sorted(rows, key=lambda r: r["id"]):
         mark = "✓" if r["got"] == r["expected"] else ("≈" if abs(r["got"] - r["expected"]) == 1 else "✗")
         counts = ", ".join(f"{n} {v.lower()}" for v, n in r["counts"].items())
         print(f"{r['id']:22} {r['expected']:>6} {r['got']:>7}{mark} {r['value']:>6.2f} {r['confidence']:>5.0%} "
               f"{r['seconds']:>5.1f}s {r['cents']:>7.3f}¢  {counts}")
+        if mark != "✓" and r.get("reason"):
+            print(f"{'':22} motivo: {r['reason'][:150]}")
 
     n = len(rows)
     if not n:
@@ -69,12 +72,12 @@ def main_eval():
     exact = sum(r["got"] == r["expected"] for r in rows) / n
     within = sum(abs(r["got"] - r["expected"]) <= 1 for r in rows) / n
     binary = sum((r["got"] >= 3) == (r["expected"] >= 3) for r in rows) / n
-    mae = sum(abs(r["value"] - r["expected"]) for r in rows) / n
+    mae = sum(abs(r["got"] - r["expected"]) for r in rows) / n
     print(f"\nArticoli: {n}")
     print(f"Stelle esatte:            {exact:.0%}")
     print(f"Entro una stella:         {within:.0%}")
     print(f"Buono/non buono corretto: {binary:.0%}")
-    print(f"Errore medio (valore):    {mae:.2f} stelle")
+    print(f"Errore medio:             {mae:.2f} stelle")
     print(f"Tempo medio:              {sum(r['seconds'] for r in rows) / n:.1f} s")
     print(f"Costo totale:             {sum(r['cents'] for r in rows):.3f} ¢ ({sum(r['cents'] for r in rows) / n:.3f} ¢ ad articolo)")
     print("\nMatrice di confusione (righe = atteso, colonne = ottenuto):")
@@ -83,7 +86,7 @@ def main_eval():
         if any(line):
             print(f"  {i + 1}★   " + " ".join(str(v).rjust(4) for v in line))
 
-    with open(HERE / "results.json", "w") as f:
+    with open(HERE / args.dataset.replace(".jsonl", "_results.json"), "w") as f:
         json.dump(rows, f, ensure_ascii=False, indent=1)
 
 

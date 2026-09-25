@@ -2,4 +2,4 @@
 __pycache__/
 *.pyc
 .venv/
-eval/results.json
+eval/*_results.json

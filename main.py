@@ -156,9 +156,14 @@ def run_bibliography_verifier(article_text, bibliography_raw):
         adherence = response.answers["claim_adherence"]
         rating = response.answers["overall_score"]
         rating_value = rating.score + 1
-        stars = min(5, max(1, round(rating_value)))
+        # Le stelle vengono dalle regole sui verdetti delle affermazioni; il voto globale di Jev
+        # resta come informazione e come riserva quando non ci sono fatti da verificare
+        stars, rating_reason = claims.rate(rows, refs)
+        rating_source = "regole"
+        if stars is None:
+            stars, rating_source = min(5, max(1, round(rating_value))), "Jev"
         verdict = _build_explanation(
-            relation, adherence, rating_value, stars, rating.confidence,
+            relation, adherence, rating_value, stars, rating_reason,
             {key: response.answers[key].noul for key in SIGNALS},
             link_statuses, rows,
         )
@@ -182,6 +187,8 @@ def run_bibliography_verifier(article_text, bibliography_raw):
             "adherence": adherence.choice,
             "rating": _stars_label(stars),
             "rating_stars": stars,
+            "rating_reason": rating_reason,
+            "rating_source": rating_source,
             "rating_value": round(rating_value, 2),
             "rating_confidence": round(rating.confidence, 3),
             "rating_good": stars >= 3,
@@ -217,12 +224,12 @@ def _stars_label(stars):
     return "★" * stars + "☆" * (5 - stars) + f" {STAR_MEANING[stars]}"
 
 
-def _build_explanation(relation, adherence, rating_value, stars, rating_confidence, signals, link_statuses, rows):
+def _build_explanation(relation, adherence, rating_value, stars, rating_reason, signals, link_statuses, rows):
     """Compone una motivazione leggibile a partire dalle risposte calibrate di Jev."""
     parts = [
         f"Pertinenza: {relation.choice} (confidenza {relation.confidence:.0%}). "
         f"Aderenza alle fonti: {adherence.choice} ({adherence.confidence:.0%}). "
-        f"Complessivo: {_stars_label(stars)} ({rating_value:.1f}/5, confidenza {rating_confidence:.0%})."
+        f"Complessivo: {_stars_label(stars)}, perché {rating_reason} (voto globale di Jev: {rating_value:.1f}/5)."
     ]
     if rows:
         parts.append("Affermazioni: " + ", ".join(f"{n} {v.lower()}" for v, n in claims.counts(rows).items()) + ".")
@@ -310,6 +317,7 @@ html_code = """
         .verdict-Fonte-irraggiungibile { background: #374151; }
         .verdict-Senza-fonte { background: #9ca3af; }
         .verdict-Opinione, .verdict-Esperienza-personale { background: #e5e7eb; color: #374151; }
+        .kind-conclusione { font-size: 0.7rem; color: #7c3aed; font-weight: 600; }
         .kpi-title {
             font-size: 0.85rem;
             text-transform: uppercase;
@@ -491,13 +499,16 @@ html_code = """
                 const excerpts = Object.entries(c.excerpts || {}).map(([ref, text]) => `<b>[${esc(ref)}]</b> ${esc(text) || '<i>nessun passaggio pertinente</i>'}`).join('\\n\\n');
                 const details = excerpts ? `<details><summary>estratti delle fonti</summary><div class="excerpt">${excerpts}</div></details>` : '';
                 const reason = c.reason ? `<div class="text-muted" style="font-size:0.78rem;"><i class="bi bi-chat-left-text"></i> ${esc(c.reason)}</div>` : '';
-                tr.innerHTML = `<td>${i + 1}</td><td>${esc(c.text)}${reason}${details}</td>`
+                const kind = c.kind === 'conclusione' ? '<span class="kind-conclusione">CONCLUSIONE</span> ' : '';
+                const world = c.world === undefined || c.world === null ? '' :
+                    `<div class="text-muted" style="font-size:0.75rem;">plausibilità secondo Jev: ${Math.round(c.world * 100)}%</div>`;
+                tr.innerHTML = `<td>${i + 1}</td><td>${kind}${esc(c.text)}${reason}${world}${details}</td>`
                     + `<td>${(c.refs || []).map(r => '[' + esc(r) + ']').join('')}</td>`
                     + `<td><span class="badge verdict-${esc(c.verdict).replace(/ /g, '-')}">${esc(c.verdict)}</span></td>`
                     + `<td class="text-end">${conf}</td><td>${by}</td>`;
                 body.appendChild(tr);
             });
-            const facts = (claims || []).filter(c => c.kind === 'fatto').length;
+            const facts = (claims || []).filter(c => c.kind === 'fatto' || c.kind === 'conclusione').length;
             const supported = (counts || {})['Sostenuta'] || 0;
             document.getElementById('kpi-claims').textContent = facts ? `${supported} / ${facts}` : '-';
             document.getElementById('kpi-claims-detail').textContent =
@@ -536,7 +547,7 @@ html_code = """
             body.appendChild(total);
         }
 
-        function renderRating(stars, fallbackText, value) {
+        function renderRating(stars, fallbackText, reason) {
             const el = document.getElementById('kpi-rating');
             el.className = 'kpi-val';
             const level = RATING_LEVELS[stars];
@@ -551,7 +562,7 @@ html_code = """
             el.classList.add(`rating-${stars}`);
             el.innerHTML = `<div class="stars">${starsHtml}</div>`
                 + `<div class="meaning"><i class="bi ${level.icon}"></i> ${level.label}</div>`
-                + (value ? `<div class="text-muted" style="font-size:0.75rem; font-weight:400;">${value.toLocaleString('it-IT', {maximumFractionDigits: 1})} / 5</div>` : '');
+                + (reason ? `<div class="text-muted" style="font-size:0.72rem; font-weight:400;">${esc(reason)}</div>` : '');
         }
 
         function renderResult(data) {
@@ -560,7 +571,7 @@ html_code = """
             const activeLinks = (data.links || []).filter(l => l.active).length;
             document.getElementById('kpi-active').textContent = activeLinks + " / " + totalLinks;
             document.getElementById('kpi-adherence').textContent = data.adherence || '-';
-            renderRating(data.rating_stars, data.rating, data.rating_value);
+            renderRating(data.rating_stars, data.rating, data.rating_reason);
             renderClaims(data.claims, data.claim_counts);
 
             // Riempie la tabella dei link

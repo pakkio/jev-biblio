@@ -38,14 +38,18 @@ Senza `OPENROUTER_API_KEY` la dashboard funziona in modalità ridotta: divide l'
 | Passaggio | Chi lo fa | Cosa succede |
 |---|---|---|
 | 1. Link e fonti | Python | Scarica in parallelo fino a 15 URL, con un tetto complessivo di 8 s, ed estrae i paragrafi di testo. |
-| 2. Estrazione | LLM (`gpt-6-luna`) | Divide l'articolo in affermazioni atomiche: **fatto**, **conclusione** dell'autore ("quindi", "dimostra che"), **opinione** o **esperienza** in prima persona. Per ognuna indica le fonti e le parole chiave in italiano e inglese. |
+| 2. Estrazione | LLM (`gpt-6-luna`), a blocchi in parallelo se l'articolo supera ~2.200 caratteri | Divide il testo in affermazioni atomiche: **fatto**, **conclusione** dell'autore ("quindi", "dimostra che"), **opinione** o **esperienza** in prima persona. Per ognuna indica le fonti e le parole chiave in italiano e inglese. Temperatura 0, per essere il più possibile ripetibile. |
 | 3. Estratti | Python + Jev | Per ogni affermazione trova fino a 12 paragrafi candidati per fonte, per parole chiave e numeri confrontati per valore ("4.700" corrisponde a "4.7k"). Poi Jev, con una domanda sì/no per paragrafo in un'unica chiamata, sceglie quelli che servono davvero a confermare o smentire. |
-| 4. Verifica | Jev, una chiamata per affermazione, in parallelo | Decide se gli estratti sostengono l'affermazione, con quale confidenza, e quanto è plausibile secondo la conoscenza generale. La plausibilità conta quando la fonte manca o non tratta il punto. |
+| 4. Verifica | Jev, una chiamata per affermazione, in parallelo | Decide se gli estratti sostengono l'affermazione, con quale confidenza, quanto è plausibile secondo la conoscenza generale e — solo se l'affermazione contiene numeri (date, quantità, misure) — se quei numeri corrispondono a quelli delle fonti. |
 | 5. Casi incerti | LLM che ragiona (`gpt-6-luna-pro`) | Solo se la confidenza di Jev è sotto l'80%: rilegge affermazione ed estratti e decide, con una frase di motivazione. |
 | 6. Voto | regole + Jev | Le stelle si calcolano con le regole qui sotto. Jev dà anche pertinenza, aderenza e un voto globale (`Score`), mostrati come informazione e usati come riserva se l'articolo non contiene fatti verificabili. |
 | 7. Giustificazione | LLM (`gpt-6-luna`) | Scrive 4-6 frasi in italiano senza cambiare i voti. |
 
 Opinioni ed esperienze personali non vengono verificate e non abbassano il voto. Le conclusioni dell'autore ("questo dimostra che…") invece vengono verificate: è lì che si nascondono gli articoli fuorvianti.
+
+### Controllo mirato sui numeri
+
+Quando un'affermazione contiene un numero abbastanza specifico da poter essere alterato (non un piccolo intero come "5 strati"), Jev riceve una domanda in più nella stessa chiamata: "gli estratti contengono lo stesso numero, o uno diverso?". Nei casi che ho provato a mano (data del lancio spostata di un giorno, altezza cambiata, annegati in un paragrafo lungo e per il resto corretto) la domanda principale di Jev intercettava già l'alterazione da sola con "Contraddetta"; il controllo sui numeri non ha ancora cambiato un verdetto nei test automatici. Resta comunque nella dashboard come segnale in più, a costo quasi nullo, e come rete di sicurezza per i casi in cui Jev giudicasse "Parzialmente sostenuta" un fatto con un numero sbagliato — un errore che le regole di voto (sotto) tratterebbero come falso.
 
 ### Regole di voto
 
@@ -100,18 +104,18 @@ uv run eval/run_eval.py --only apollo11,curie                       # solo alcun
 
 Risultati di settembre 2026:
 
-| | Voto globale Jev (v1) | Per affermazione, voto Jev (v2) | Per affermazione + regole (v3), sviluppo | v3, **test** |
+| | Voto globale Jev (v1) | Per affermazione, voto Jev (v2) | Per affermazione + regole (v3) | v3 + estratti Jev, estrazione a blocchi, controllo numeri (v4) |
 |---|---|---|---|---|
-| Stelle esatte | 62% | 71% | 95% | **100%** (18/18) |
-| Entro una stella | 100% | 100% | 100% | 100% |
-| Buono / non buono corretto | 100% | 100% | 100% | 100% |
-| Tempo medio | 5 s | 16,5 s | 14,4 s | 11,2 s |
-| Costo medio | 0,019 ¢ | 0,196 ¢ | 0,202 ¢ | 0,118 ¢ |
+| Stelle esatte, sviluppo | 62% | 71% | 95% | 90-95%* |
+| Stelle esatte, **test** | — | — | 100% | 100% |
+| Tempo medio, sviluppo | 5 s | 16,5 s | 14,4 s | 17,1 s |
+| Tempo medio, **articolo lungo** (~9.000 caratteri) | — | — | 20,8 s (estrazione) | **11,6 s** (estrazione, -44%) |
+| Costo medio, sviluppo | 0,019 ¢ | 0,196 ¢ | 0,202 ¢ | 0,225 ¢ |
 
-**Selezione degli estratti con Jev** (`EXCERPT_SELECTION=jev`, predefinita): rispetto alla sola ricerca per parole chiave, le affermazioni "Non trovata" nel set di test scendono dal 17% al 12% e le "Sostenuta" salgono dal 49% al 51%. Il voto in stelle non cambia (sviluppo 95%, test 94-100%) e il costo cresce del 10-30%. Il guadagno è negli estratti mostrati per ogni affermazione, più pertinenti.
+*\*Ho visto oscillare lo stesso articolo tra 3★ e 4★ da un'esecuzione all'altra (Grande muraglia, versione corretta): la selezione degli estratti fatta da Jev non è deterministica, quindi a volte sceglie un paragrafo diverso e il verdetto cambia. Non è una regressione di questa versione — l'ho verificato rilanciando lo stesso articolo tre volte.*
 
 **Come leggerli:**
-- **Variabilità:** tra un'esecuzione e l'altra il risultato può cambiare di un articolo, soprattutto sui fuorvianti al confine tra 1★ e 2★. L'estrazione del LLM a volte marca come "fatto" una parte di una conclusione.
+- **Variabilità:** oltre al caso sopra, gli articoli fuorvianti al confine tra 1★ e 2★ possono cambiare risultato da un'esecuzione all'altra (es. Galileo fuorviante: 2★, 1★, 1★ su tre run). L'estrazione del LLM a volte marca come "fatto" una parte di una conclusione.
 - **Chi ha scritto le etichette:** entrambi i set sono stati scritti ed etichettati da chi ha sviluppato le regole, con tre categorie nette. Il test su articoli mai visti riduce il rischio di aver adattato le regole ai dati, ma non lo elimina.
 - **Margine statistico:** con 18 articoli, un 100% è compatibile con una precisione reale intorno all'85-90%.
 - **Articoli reali:** quelli veri sono più sfumati (errori isolati in articoli buoni, opinioni mescolate ai fatti) e il confine tra 3★, 4★ e 5★ è meno netto di quello tra falso e fuorviante.
@@ -126,6 +130,7 @@ Risultati di settembre 2026:
 | `OPENROUTER_MODEL` | `openai/gpt-6-luna` | modello per estrazione e giustificazione |
 | `ESCALATION_MODEL` | `openai/gpt-6-luna-pro` | modello che ragiona sui casi incerti |
 | `ESCALATION_THRESHOLD` | `0.8` | sotto questa confidenza di Jev il caso passa al LLM |
+
 | `MAX_ESCALATIONS` | `8` | massimo di casi incerti passati al LLM per articolo |
 | `EXCERPT_SELECTION` | `jev` | `jev`: Jev sceglie i paragrafi pertinenti; `keywords`: solo parole chiave, più economico |
 | `JEV_PRICE_PER_M_INPUT` | `0.042` | prezzo Jev in USD per milione di token di input |
@@ -202,7 +207,8 @@ In caso di errore la risposta è `{"error": "…"}`.
 ## Limiti
 
 - **Pagine dinamiche:** si legge solo l'HTML statico. Le pagine costruite via JavaScript danno pochi paragrafi, e le affermazioni risultano "Non trovata" anche quando la fonte è corretta (succede con alcune pagine NASA).
-- **Estratti:** la scelta dei paragrafi si basa su parole chiave, non sul significato, quindi a volte il passaggio giusto resta fuori.
+- **Estratti non deterministici:** la selezione con Jev sceglie candidati diversi da un'esecuzione all'altra, e questo può far oscillare di una stella il voto di uno stesso articolo (vedi Valutazione).
 - **Regole semplici:** una sola affermazione giudicata falsa porta a 1★. Un errore di Jev su un fatto isolato può quindi abbassare molto il voto, e il motivo mostrato permette di accorgersene.
+- **Estrazione a blocchi:** su articoli lunghi ogni blocco è estratto con poco contesto delle altre parti; un pronome o riferimento che punta a un blocco diverso può non essere risolto.
 - **Costo e tempo:** la verifica per affermazione costa circa 10 volte il solo voto globale ed è circa 3 volte più lenta.
 - **Connessione:** la pagina carica Bootstrap da CDN, quindi serve internet.

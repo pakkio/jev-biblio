@@ -64,7 +64,7 @@ def available():
     return bool(os.getenv("OPENROUTER_API_KEY"))
 
 
-def chat(prompt, model=None, reasoning=False, timeout=90, json_mode=False):
+def chat(prompt, model=None, reasoning=False, timeout=90, json_mode=False, temperature=None):
     """Una chiamata di chat. `model` sceglie un modello specifico, con la catena come riserva;
     `json_mode` chiede una risposta in JSON valido.
 
@@ -89,6 +89,8 @@ def chat(prompt, model=None, reasoning=False, timeout=90, json_mode=False):
     }
     if json_mode:
         body["response_format"] = {"type": "json_object"}
+    if temperature is not None:
+        body["temperature"] = temperature
     req = urllib.request.Request(
         OPENROUTER_URL,
         data=json.dumps(body).encode("utf-8"),

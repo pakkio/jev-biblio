@@ -502,7 +502,9 @@ html_code = """
                 const kind = c.kind === 'conclusione' ? '<span class="kind-conclusione">CONCLUSIONE</span> ' : '';
                 const world = c.world === undefined || c.world === null ? '' :
                     `<div class="text-muted" style="font-size:0.75rem;">plausibilità secondo Jev: ${Math.round(c.world * 100)}%</div>`;
-                tr.innerHTML = `<td>${i + 1}</td><td>${kind}${esc(c.text)}${reason}${world}${details}</td>`
+                const numbers = c.number_match === undefined || c.number_match === null ? '' :
+                    `<div class="text-muted" style="font-size:0.75rem;"><i class="bi bi-123"></i> numero confermato dalla fonte: ${Math.round(c.number_match * 100)}%</div>`;
+                tr.innerHTML = `<td>${i + 1}</td><td>${kind}${esc(c.text)}${reason}${world}${numbers}${details}</td>`
                     + `<td>${(c.refs || []).map(r => '[' + esc(r) + ']').join('')}</td>`
                     + `<td><span class="badge verdict-${esc(c.verdict).replace(/ /g, '-')}">${esc(c.verdict)}</span></td>`
                     + `<td class="text-end">${conf}</td><td>${by}</td>`;

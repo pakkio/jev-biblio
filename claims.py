@@ -179,12 +179,38 @@ def html_to_paragraphs(html):
 
 # --- Estrazione delle affermazioni --------------------------------------------------------------
 
-def extract_claims_llm(article, refs):
-    """Chiede a un LLM le affermazioni atomiche dell'articolo. Restituisce (affermazioni, metriche)."""
+# Sopra questa soglia l'articolo viene diviso in blocchi ed estratto in parallelo:
+# è la chiamata più lenta della pipeline (10-20 s) e la sua durata scala con la lunghezza del testo.
+CHUNK_CHARS = 2200
+
+
+def _split_into_chunks(article, chunk_chars=CHUNK_CHARS):
+    """Divide l'articolo in blocchi sui confini di paragrafo, ciascuno entro chunk_chars."""
+    paragraphs = [p for p in re.split(r"\n\s*\n", article) if p.strip()]
+    chunks, current = [], ""
+    for paragraph in paragraphs:
+        if current and len(current) + len(paragraph) > chunk_chars:
+            chunks.append(current)
+            current = paragraph
+        else:
+            current = f"{current}\n\n{paragraph}" if current else paragraph
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _extract_claims_llm_one(article, refs, max_claims, partial=False):
+    """Una chiamata di estrazione. `partial` avvisa che il testo è solo un blocco dell'articolo."""
     sources = "\n".join(f"[{n}] {r['title']} {r['url']}" for n, r in refs.items()) or "(nessuna fonte)"
+    context_note = (
+        " Il testo è UN BLOCCO di un articolo più lungo: estrai solo le affermazioni di questo blocco, "
+        "sostituendo comunque pronomi e riferimenti impliciti con ciò che indicano (nomi, soggetti) "
+        "quando è chiaro dal blocco stesso."
+        if partial else ""
+    )
     prompt = (
-        "Estrai dall'articolo le affermazioni da verificare, al massimo "
-        f"{MAX_CLAIMS}, nell'ordine in cui compaiono.\n"
+        f"Estrai dal testo le affermazioni da verificare, al massimo {max_claims}, "
+        f"nell'ordine in cui compaiono.{context_note}\n"
         "Regole:\n"
         "- ogni affermazione è atomica (un solo fatto) e comprensibile da sola: sostituisci pronomi e riferimenti impliciti;\n"
         "- riporta ciò che l'articolo afferma, comprese esagerazioni ed errori: non correggerlo e non attenuarlo;\n"
@@ -201,12 +227,13 @@ def extract_claims_llm(article, refs):
         "compresi nomi propri, termini tecnici e numeri anche in forma inglese (es. 4.700 -> 4,700 e 4.7k; nove -> nine).\n\n"
         'Rispondi solo con JSON: {"affermazioni": [{"testo": "...", "tipo": "fatto", "fonti": ["1"], '
         '"parole_chiave": ["..."]}]}\n\n'
-        f"FONTI:\n{sources}\n\nARTICOLO:\n{article}"
+        f"FONTI:\n{sources}\n\nTESTO:\n{article}"
     )
-    reply = llm.chat(prompt, timeout=120, json_mode=True)
+    # temperatura 0: l'estrazione deve essere la più ripetibile possibile
+    reply = llm.chat(prompt, timeout=120, json_mode=True, temperature=0)
     data = llm.parse_json(reply["text"])
     claims = []
-    for item in data.get("affermazioni", [])[:MAX_CLAIMS]:
+    for item in data.get("affermazioni", [])[:max_claims]:
         text = str(item.get("testo", "")).strip()
         if not text:
             continue
@@ -217,7 +244,34 @@ def extract_claims_llm(article, refs):
             "refs": [str(r).strip("[] ") for r in item.get("fonti", []) if str(r).strip("[] ") in refs],
             "keywords": [str(k) for k in item.get("parole_chiave", [])][:10],
         })
-    return claims, {k: v for k, v in reply.items() if k != "text"}
+    return claims, reply
+
+
+def extract_claims_llm(article, refs):
+    """Chiede a un LLM le affermazioni atomiche dell'articolo, a blocchi in parallelo se è lungo.
+
+    Restituisce (affermazioni, metriche): seconds è il tempo di parete (i blocchi vanno in parallelo),
+    token e costo sono la somma di tutte le chiamate."""
+    chunks = _split_into_chunks(article)
+    if len(chunks) <= 1:
+        claims, reply = _extract_claims_llm_one(article, refs, MAX_CLAIMS)
+        return claims, {k: v for k, v in reply.items() if k != "text"}
+
+    per_chunk = max(4, MAX_CLAIMS // len(chunks) + 2)
+    start = time.perf_counter()
+    with ThreadPoolExecutor(max_workers=len(chunks)) as pool:
+        results = list(pool.map(lambda c: _extract_claims_llm_one(c, refs, per_chunk, partial=True), chunks))
+    claims = [claim for claims_i, _ in results for claim in claims_i][:MAX_CLAIMS]
+    replies = [reply for _, reply in results]
+    metrics = {
+        "model": replies[0]["model"],
+        "seconds": round(time.perf_counter() - start, 3),
+        "input_tokens": sum(r["input_tokens"] for r in replies),
+        "output_tokens": sum(r["output_tokens"] for r in replies),
+        "cost_cents": sum(r["cost_cents"] for r in replies),
+        "chunks": len(chunks),
+    }
+    return claims, metrics
 
 
 def split_claims(article):
@@ -336,6 +390,15 @@ def _select_with_jev(client, claim, candidates):
 
 WORLD_QUESTION = ("Indipendentemente dagli estratti, l'affermazione è vera secondo le conoscenze storiche "
                   "e scientifiche consolidate?")
+NUMBER_QUESTION = ("L'affermazione contiene numeri (date, quantità, misure). Gli estratti contengono "
+                   "almeno uno di quei numeri, esattamente com'è nell'affermazione o con un arrotondamento "
+                   "normale (es. 8.849 e circa 8.850 contano uguali)? Rispondi no se gli estratti riportano "
+                   "un numero diverso per lo stesso dato, o se non contengono affatto quel numero.")
+
+
+def _has_checkable_numbers(text):
+    """Solo numeri abbastanza specifici da poter essere alterati in modo rilevabile."""
+    return bool({n for n in _numbers(text) if n >= 10 or n != int(n)})
 
 
 def _ask_jev(client, claim, sources):
@@ -345,6 +408,9 @@ def _ask_jev(client, claim, sources):
     for ref, source in sources.items():
         state += f"\nESTRATTO DELLA FONTE [{ref}] ({source['url']}):\n{source['excerpt'] or '(nessun passaggio pertinente trovato)'}\n"
     questions = {"world": Noul(instructions=WORLD_QUESTION)}
+    check_numbers = sources and _has_checkable_numbers(claim["text"])
+    if check_numbers:
+        questions["numbers"] = Noul(instructions=NUMBER_QUESTION)
     if sources:
         questions["verdict"] = Choice(
             instructions="Gli estratti delle fonti citate sostengono l'affermazione?",
@@ -356,6 +422,8 @@ def _ask_jev(client, claim, sources):
         "input_tokens": response.usage.input_tokens,
         "output_tokens": response.usage.output_tokens,
     }
+    if check_numbers:
+        result["number_match"] = response.answers["numbers"].noul
     if sources:
         answer = response.answers["verdict"]
         result.update(verdict=answer.choice, confidence=answer.confidence, probabilities=answer.probabilities)
@@ -514,6 +582,11 @@ def rate(rows, refs):
     for r in facts:
         if (r["verdict"] == "Contraddetta" and world(r) < 0.5) or world(r) < 0.15:
             return 1, f"fatto falso: «{r['text']}»"
+    # 1 stella: un numero (data, quantità, misura) è diverso da quello riportato dalla fonte,
+    # e non è un fatto abbastanza noto perché Jev possa dirlo da solo
+    for r in facts:
+        if r.get("number_match") is not None and r["number_match"] < 0.35 and world(r) < 0.65:
+            return 1, f"numero alterato rispetto alla fonte: «{r['text']}»"
     # 1 stella: un fatto implausibile appoggiato solo a fonti irraggiungibili (citazione inventata)
     for r in checked:
         if only_unreachable(r) and world(r) < 0.5:

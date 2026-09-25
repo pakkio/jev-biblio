@@ -1,9 +1,9 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["typesafe-sdk", "python-dotenv"]
+# dependencies = ["typesafe-sdk", "python-dotenv", "pypdf"]
 # ///
 """
-📊 Verificatore di Bibliografia e Affermazioni (versione locale).
+📊 Skepsis — verifica di fonti e affermazioni (versione locale).
 
 Uso:
     uv run main.py [--port 8000] [--no-browser]
@@ -27,10 +27,14 @@ load_dotenv(HERE / ".env")
 load_dotenv(HERE.parent / ".env")
 
 import claims  # noqa: E402  (dopo load_dotenv: legge le variabili d'ambiente)
+import discovery  # noqa: E402
 import llm  # noqa: E402
 
 # Prezzo Jev: $42 per miliardo di token di input (typesafe.ai), output gratuito
 JEV_PRICE_PER_M_INPUT = float(os.getenv("JEV_PRICE_PER_M_INPUT", "0.042"))
+MAX_REQUEST_BYTES = 1_000_000
+MAX_ARTICLE_CHARS = 100_000
+MAX_BIBLIOGRAPHY_CHARS = 30_000
 
 # Significato delle stelle: 1-2 non buono (1 molto falso, 2 vero ma fuorviante), 3 buono, 4 molto buono, 5 ottimo
 STAR_MEANING = {1: "Molto falso", 2: "Vero ma fuorviante", 3: "Buono", 4: "Molto buono", 5: "Ottimo"}
@@ -70,8 +74,18 @@ def _step(name, model, seconds, input_tokens=0, output_tokens=0, cost_cents=0.0,
 
 
 # 1. Logica principale del verificatore, chiamata dal frontend
-def run_bibliography_verifier(article_text, bibliography_raw):
+def run_bibliography_verifier(article_text, bibliography_raw, find_authoritative_sources=False):
     try:
+        if not isinstance(article_text, str) or not isinstance(bibliography_raw, str):
+            return json.dumps({"error": "Articolo e bibliografia devono essere testo."})
+        if not isinstance(find_authoritative_sources, bool):
+            return json.dumps({"error": "find_authoritative_sources deve essere booleano."})
+        if not article_text.strip() or not bibliography_raw.strip():
+            return json.dumps({"error": "Inserisci sia l'articolo sia almeno una fonte bibliografica."})
+        if len(article_text) > MAX_ARTICLE_CHARS:
+            return json.dumps({"error": f"Articolo troppo lungo: massimo {MAX_ARTICLE_CHARS:,} caratteri."})
+        if len(bibliography_raw) > MAX_BIBLIOGRAPHY_CHARS:
+            return json.dumps({"error": f"Bibliografia troppo lunga: massimo {MAX_BIBLIOGRAPHY_CHARS:,} caratteri."})
         api_key = os.getenv('TYPESAFE_API_KEY')
         if not api_key:
             return json.dumps({"error": "TYPESAFE_API_KEY non trovata nell'ambiente o nel file .env."})
@@ -109,6 +123,44 @@ def run_bibliography_verifier(article_text, bibliography_raw):
             steps.append(_step(f"LLM: casi incerti ({escalation['calls']})", escalation["model"],
                                escalation["seconds"], escalation["input_tokens"], escalation["output_tokens"],
                                escalation["cost_cents"], "; ".join(escalation["errors"]) or None))
+
+        # Riscontro esterno opzionale: non entra nel voto, perché non deve far
+        # sembrare citato bene un articolo le cui fonti originali sono carenti.
+        external_check = {"requested": find_authoritative_sources, "available": discovery.available(),
+                          "sources": [], "checks": [], "message": None}
+        if find_authoritative_sources:
+            if not discovery.available():
+                external_check["message"] = "Ricerca non disponibile: configura TAVILY_API_KEY."
+            else:
+                missing_verdicts = {"Non trovata", "Contraddetta", "Esagerata", claims.NO_SOURCE, claims.UNREACHABLE}
+                candidates = [
+                    (index, claim) for index, (claim, row) in enumerate(zip(claim_list, rows))
+                    if claim["kind"] in {"fatto", "conclusione"} and row["verdict"] in missing_verdicts
+                ]
+                if not candidates:
+                    external_check["message"] = "Nessun claim non coperto dalla bibliografia richiede una ricerca esterna."
+                else:
+                    start = time.perf_counter()
+                    sources, search_errors = discovery.discover_for_claims(candidates)
+                    steps.append(_step(f"Ricerca fonti autorevoli ({len(candidates)} claim)", "Tavily",
+                                       time.perf_counter() - start, error="; ".join(search_errors) or None))
+                    external_check["sources"] = sources
+                    if not sources:
+                        external_check["message"] = "Nessuna fonte ha superato la policy di dominio autorevole."
+                    else:
+                        external_links, external_pages = claims.fetch_all([source["url"] for source in sources])
+                        status_by_url = {status["url"]: status for status in external_links}
+                        for source in sources:
+                            source.update(status_by_url.get(source["url"], {}))
+                        checks, metrics = claims.verify_external_sources(client, claim_list, sources, external_pages)
+                        external_check["checks"] = checks
+                        external_check["message"] = (
+                            "Riscontro esterno: non modifica il voto della bibliografia originale."
+                        )
+                        if metrics["calls"] or metrics["errors"]:
+                            steps.append(_step(f"Jev: riscontro fonti esterne ({metrics['calls']} claim)", "jev-latest",
+                                               metrics["seconds"], metrics["input_tokens"], metrics["output_tokens"],
+                                               _jev_cents(metrics["input_tokens"]), "; ".join(metrics["errors"]) or None))
         claims_summary = claims.summarize(rows)
 
         # Valutazione globale con Jev, informata dai verdetti delle singole affermazioni
@@ -181,6 +233,7 @@ def run_bibliography_verifier(article_text, bibliography_raw):
 
         result = {
             "links": link_statuses,
+            "external_check": external_check,
             "claims": rows,
             "claim_counts": claims.counts(rows),
             "relation": relation.choice,
@@ -256,7 +309,7 @@ html_code = """
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Verificatore Bibliografia</title>
+    <title>Skepsis — Verifica fonti</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -329,7 +382,8 @@ html_code = """
 </head>
 <body>
     <div class="dashboard-container">
-        <h2 class="mb-4" style="color: #1e1b4b; font-weight: 700;">📚 Verificatore di Bibliografia e Affermazioni</h2>
+        <h2 class="mb-1" style="color: #1e1b4b; font-weight: 700;">📚 Skepsis</h2>
+        <p class="text-muted mb-4">Verifica delle affermazioni fondata sulle fonti con Jev.</p>
 
         <!-- Input -->
         <div class="card p-4">
@@ -344,6 +398,13 @@ html_code = """
 - Smith, J. Simulazioni quantistiche in chimica (2021). Nature. https://httpbin.org/status/404
 - Miller, A. Affermazioni false sul calcolo quantistico. (2022). https://httpbin.org/status/500</textarea>
                 </div>
+            </div>
+            <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" id="external-sources-input">
+                <label class="form-check-label" for="external-sources-input">
+                    Cerca fonti autorevoli aggiuntive per i claim non coperti
+                </label>
+                <div class="form-text">Riscontro separato: non modifica il voto della bibliografia. Richiede <code>TAVILY_API_KEY</code>.</div>
             </div>
             <button class="btn btn-primary mt-2" id="btn-run" style="background-color:#4f46e5; border:none;">Avvia analisi Jev e controllo link</button>
         </div>
@@ -412,6 +473,19 @@ html_code = """
                 </div>
             </div>
 
+            <div class="card d-none" id="external-sources-card">
+                <div class="card-header"><i class="bi bi-search"></i> Riscontro con fonti autorevoli aggiuntive</div>
+                <div class="card-body">
+                    <p class="text-muted mb-2" id="external-sources-message"></p>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>Claim</th><th>Fonte trovata</th><th>Policy</th><th>Riscontro Jev</th></tr></thead>
+                            <tbody id="external-sources-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div class="row">
                 <!-- Colonna sinistra: tabella dei link verificati -->
                 <div class="col-md-6">
@@ -425,6 +499,7 @@ html_code = """
                                             <th>URL della fonte</th>
                                             <th>Stato HTTP</th>
                                             <th>Attivo</th>
+                                            <th>Contenuto</th>
                                         </tr>
                                     </thead>
                                     <tbody id="links-table-body"></tbody>
@@ -567,6 +642,34 @@ html_code = """
                 + (reason ? `<div class="text-muted" style="font-size:0.72rem; font-weight:400;">${esc(reason)}</div>` : '');
         }
 
+        function renderExternalSources(external) {
+            const card = document.getElementById('external-sources-card');
+            if (!external || !external.requested) {
+                card.classList.add('d-none');
+                return;
+            }
+            card.classList.remove('d-none');
+            document.getElementById('external-sources-message').textContent = external.message || '';
+            const checksByClaim = new Map((external.checks || []).map(check => [check.claim_index, check]));
+            const body = document.getElementById('external-sources-table-body');
+            body.innerHTML = '';
+            (external.sources || []).forEach(source => {
+                const check = checksByClaim.get(source.claim_index);
+                const row = document.createElement('tr');
+                const verdict = check ? `${check.verdict}${check.confidence != null ? ' · ' + Math.round(check.confidence * 100) + '%' : ''}` : 'Non verificata';
+                row.innerHTML = `
+                    <td>#${source.claim_index + 1}</td>
+                    <td><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a><br><small class="text-muted">${esc(source.status || '')}</small></td>
+                    <td>${esc(source.authority || '')}<br><small class="text-muted">${esc(source.content_available ? 'pagina letta' : 'snippet di ricerca')}</small></td>
+                    <td>${esc(verdict)}</td>
+                `;
+                body.appendChild(row);
+            });
+            if (!(external.sources || []).length) {
+                body.innerHTML = '<tr><td colspan="4" class="text-muted">Nessuna fonte aggiuntiva disponibile.</td></tr>';
+            }
+        }
+
         function renderResult(data) {
             // Riempie le schede di riepilogo
             const totalLinks = (data.links || []).length;
@@ -575,6 +678,7 @@ html_code = """
             document.getElementById('kpi-adherence').textContent = data.adherence || '-';
             renderRating(data.rating_stars, data.rating, data.rating_reason);
             renderClaims(data.claims, data.claim_counts);
+            renderExternalSources(data.external_check);
 
             // Riempie la tabella dei link
             const tableBody = document.getElementById('links-table-body');
@@ -582,10 +686,15 @@ html_code = """
             (data.links || []).forEach(link => {
                 const row = document.createElement('tr');
                 const badgeClass = link.active ? 'bg-success' : 'bg-danger';
+                const contentClass = link.content_available ? 'bg-success' : 'bg-secondary';
+                const contentLabel = link.content_available
+                    ? `LETTO${link.source_type ? ' · ' + link.source_type : ''}`
+                    : 'NON DISPONIBILE';
                 row.innerHTML = `
                     <td><a href="${esc(link.url)}" target="_blank" rel="noopener" class="text-truncate d-inline-block" style="max-width:280px;">${esc(link.url)}</a></td>
                     <td><code>${esc(link.status)}</code></td>
                     <td><span class="badge ${badgeClass}">${link.active ? 'ATTIVO' : 'NON ATTIVO'}</span></td>
+                    <td><span class="badge ${contentClass}">${esc(contentLabel)}</span></td>
                 `;
                 tableBody.appendChild(row);
             });
@@ -601,6 +710,7 @@ html_code = """
         document.getElementById('btn-run').addEventListener('click', function() {
             const articleText = document.getElementById('article-input').value;
             const bibText = document.getElementById('bib-input').value;
+            const findAuthoritativeSources = document.getElementById('external-sources-input').checked;
 
             if(!articleText || !bibText) {
                 alert("Inserisci sia il testo dell'articolo sia i riferimenti bibliografici.");
@@ -613,7 +723,8 @@ html_code = """
             fetch('/api/verify', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({article: articleText, bibliography: bibText})
+                body: JSON.stringify({article: articleText, bibliography: bibText,
+                    find_authoritative_sources: findAuthoritativeSources})
             })
                 .then(response => response.text())
                 .then(body => {
@@ -658,11 +769,24 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _read_json(self):
-        length = int(self.headers.get("Content-Length") or 0)
         try:
-            return json.loads(self.rfile.read(length) or b"{}")
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._send(400, json.dumps({"error": "Content-Length non valido."}), "application/json")
+            return None
+        if length < 0 or length > MAX_REQUEST_BYTES:
+            self._send(413, json.dumps({"error": f"Richiesta troppo grande: massimo {MAX_REQUEST_BYTES // 1_000_000} MB."}),
+                       "application/json")
+            return None
+        try:
+            payload = json.loads(self.rfile.read(length) or b"{}")
         except json.JSONDecodeError:
-            return {}
+            self._send(400, json.dumps({"error": "JSON non valido."}), "application/json")
+            return None
+        if not isinstance(payload, dict):
+            self._send(400, json.dumps({"error": "Il corpo JSON deve essere un oggetto."}), "application/json")
+            return None
+        return payload
 
     def do_GET(self):
         if self.path in ("/", "/index.html"):
@@ -672,9 +796,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         payload = self._read_json()
+        if payload is None:
+            return
         if self.path == "/api/verify":
             result = run_bibliography_verifier(
-                payload.get("article", ""), payload.get("bibliography", "")
+                payload.get("article", ""), payload.get("bibliography", ""),
+                payload.get("find_authoritative_sources", False),
             )
             self._send(200, result, "application/json")
         elif self.path == "/api/js-error":
@@ -685,11 +812,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Dashboard del Verificatore di Bibliografia e Affermazioni")
+    parser = argparse.ArgumentParser(description="Dashboard Skepsis per la verifica di fonti e affermazioni")
     parser.add_argument("--host", default="127.0.0.1", help="indirizzo su cui ascoltare (predefinito: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="porta del server (predefinita: 8000)")
     parser.add_argument("--no-browser", action="store_true", help="non aprire automaticamente il browser")
+    parser.add_argument("--allow-remote", action="store_true",
+                        help="consenti un host non locale: usa solo dietro autenticazione e proxy sicuro")
     args = parser.parse_args()
+
+    if args.host not in {"127.0.0.1", "::1", "localhost"} and not args.allow_remote:
+        parser.error("per ascoltare su un host non locale devi aggiungere --allow-remote")
 
     if not os.getenv("TYPESAFE_API_KEY"):
         print("[AVVISO] TYPESAFE_API_KEY non impostata: le verifiche non funzioneranno.")
@@ -697,6 +829,8 @@ def main():
         print("[AVVISO] OPENROUTER_API_KEY non impostata: verrà usato solo il riepilogo di Jev.")
     else:
         print(f"Modelli OpenRouter: {' → '.join(llm.model_chain())} (casi incerti: {claims.ESCALATION_MODEL})")
+    if args.allow_remote:
+        print("[AVVISO] API esposta: configura autenticazione e rate limiting nel proxy davanti a Skepsis.")
 
     server = ThreadingHTTPServer((args.host, args.port), DashboardHandler)
     url = f"http://{args.host}:{args.port}/"

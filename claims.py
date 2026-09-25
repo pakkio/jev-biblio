@@ -7,14 +7,19 @@ Verifica affermazione per affermazione.
 3. Jev decide, per ogni fatto, se gli estratti delle fonti lo sostengono;
 4. se Jev è incerto (confidenza sotto soglia) il caso passa a un LLM che ragiona.
 """
+import io
+import ipaddress
+import json
 import math
 import os
 import re
+import socket
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from html.parser import HTMLParser
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlsplit
 
 from typesafe_sdk import Choice, Noul
 
@@ -47,6 +52,9 @@ CANDIDATES = 12
 CANDIDATE_CHARS = 700
 RELEVANCE_THRESHOLD = 0.5
 MAX_SELECTED = 3
+MAX_SOURCE_BYTES = 2_000_000
+MAX_SOURCE_CHARS = 250_000
+MAX_PDF_PAGES = 50
 
 STOPWORDS = set("""
 alla alle allo anche avere come con contro cosa così dalla dalle dallo degli della delle dello dopo dove
@@ -57,7 +65,45 @@ their there these they this were which with would
 """.split())
 
 
-# --- Bibliografia e download delle fonti -------------------------------------------------------
+# --- Fonti: parsing, protezioni e download -----------------------------------------------------
+
+
+class UnsafeSourceURL(ValueError):
+    """URL non adatto a essere scaricato da un servizio di verifica."""
+
+
+def _validate_source_url(url):
+    """Accetta solo URL HTTP(S) pubblici, evitando richieste verso reti interne.
+
+    La dashboard ascolta di default solo su localhost, ma questa protezione evita
+    SSRF accidentali se l'API viene pubblicata dietro un proxy o con --host remoto.
+    """
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise UnsafeSourceURL("sono ammessi solo URL http:// o https://")
+    if not parsed.hostname or parsed.username or parsed.password:
+        raise UnsafeSourceURL("l'URL deve avere un host pubblico e non può contenere credenziali")
+    try:
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        addresses = {
+            info[4][0]
+            for info in socket.getaddrinfo(parsed.hostname, port, type=socket.SOCK_STREAM)
+        }
+    except (OSError, ValueError) as exc:
+        raise UnsafeSourceURL("host non risolvibile") from exc
+    if not addresses:
+        raise UnsafeSourceURL("host non risolvibile")
+    if any(not ipaddress.ip_address(address).is_global for address in addresses):
+        raise UnsafeSourceURL("gli indirizzi privati, locali o riservati non sono consentiti")
+    return url
+
+
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Riapplica il controllo SSRF anche a ogni redirect HTTP."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _validate_source_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 def clean_url(url):
     """Rimuove la punteggiatura finale, mantenendo una ')' che chiude una '(' interna all'URL."""
@@ -84,26 +130,114 @@ def parse_references(bibliography):
     return refs
 
 
-def fetch_page(url, timeout=8, max_bytes=2_000_000):
-    """Scarica una pagina e restituisce lo stato del link e l'HTML (None se non è testo)."""
+def _pdf_to_text(body):
+    """Estrae testo da PDF entro limiti deliberatamente conservativi."""
+    try:
+        from pypdf import PdfReader
+    except ImportError as exc:
+        raise RuntimeError("supporto PDF non disponibile") from exc
+    reader = PdfReader(io.BytesIO(body))
+    text = "\n\n".join((page.extract_text() or "") for page in reader.pages[:MAX_PDF_PAGES])
+    return text[:MAX_SOURCE_CHARS]
+
+
+def _download_raw(url, timeout, max_bytes):
+    """Esegue la richiesta HTTP e restituisce (status, content_type, body, charset)."""
     req = urllib.request.Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BibliographyVerifier/1.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Skepsis/1.0",
         "Accept-Language": "it,en;q=0.8",
     })
+    opener = urllib.request.build_opener(_SafeRedirectHandler())
+    with opener.open(req, timeout=timeout) as response:
+        status = str(response.getcode())
+        content_type = response.headers.get("Content-Type", "")
+        body = response.read(max_bytes + 1)
+        charset = response.headers.get_content_charset() or "utf-8"
+    return status, content_type, body, charset
+
+
+def _decode_body(body, content_type, charset, max_bytes):
+    """Converte i byte scaricati in testo (HTML/testo o PDF). Solleva ValueError se non è possibile."""
+    if len(body) > max_bytes:
+        raise ValueError(f"contenuto oltre {max_bytes // 1_000_000} MB")
+    is_pdf = "pdf" in content_type.lower() or body.lstrip().startswith(b"%PDF-")
+    is_text = "html" in content_type.lower() or "text" in content_type.lower()
+    if is_pdf:
+        return _pdf_to_text(body), "PDF"
+    if is_text:
+        return body.decode(charset, "ignore")[:MAX_SOURCE_CHARS], "HTML/testo"
+    raise ValueError("formato non testuale")
+
+
+WAYBACK_API = "https://archive.org/wayback/available?url={}"
+
+
+def _wayback_snapshot_url(url, timeout=6):
+    """Cerca l'ultimo snapshot di Wayback Machine per un URL, come riserva quando il sito
+    blocca le richieste automatiche ma un umano può comunque raggiungerlo da browser."""
     try:
+        api_url = WAYBACK_API.format(quote(url, safe=""))
+        req = urllib.request.Request(api_url, headers={"User-Agent": "Mozilla/5.0 Skepsis/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as response:
-            status = str(response.getcode())
-            content_type = response.headers.get("Content-Type", "")
-            body = response.read(max_bytes)
-            charset = response.headers.get_content_charset() or "utf-8"
-    except HTTPError as e:
-        return {"url": url, "status": str(e.code), "active": False}, None
-    except URLError:
-        return {"url": url, "status": "DNS / Irraggiungibile", "active": False}, None
+            data = json.loads(response.read().decode("utf-8", "ignore"))
     except Exception:
-        return {"url": url, "status": "Errore", "active": False}, None
-    is_text = "html" in content_type or "text" in content_type
-    return {"url": url, "status": status, "active": True}, (body.decode(charset, "ignore") if is_text else None)
+        return None
+    snapshot = data.get("archived_snapshots", {}).get("closest", {})
+    if snapshot.get("available") and snapshot.get("url"):
+        return snapshot["url"].replace("http://web.archive.org", "https://web.archive.org", 1)
+    return None
+
+
+def fetch_page(url, timeout=8, max_bytes=MAX_SOURCE_BYTES):
+    """Scarica HTML, testo o PDF; blocca URL privati e contenuti troppo grandi.
+
+    Se il sito blocca la richiesta con una verifica anti-bot (es. sfida Cloudflare),
+    tenta di recuperare l'ultimo snapshot da Wayback Machine come riserva.
+    """
+    try:
+        _validate_source_url(url)
+    except UnsafeSourceURL as exc:
+        return {"url": url, "status": f"URL non consentito: {exc}", "active": False,
+                "content_available": False}, None
+    try:
+        status, content_type, body, charset = _download_raw(url, timeout, max_bytes)
+    except HTTPError as e:
+        status = str(e.code)
+        server = (e.headers.get("Server") or "").lower()
+        blocked_by_bot_check = e.code in (403, 503) and ("cloudflare" in server or e.headers.get("cf-mitigated"))
+        if blocked_by_bot_check:
+            snapshot_url = _wayback_snapshot_url(url)
+            if snapshot_url:
+                try:
+                    _validate_source_url(snapshot_url)
+                    _, snap_type, snap_body, snap_charset = _download_raw(snapshot_url, timeout, max_bytes)
+                    text, source_type = _decode_body(snap_body, snap_type, snap_charset, max_bytes)
+                    if text:
+                        return {"url": url,
+                                "status": f"{status} (bloccata dal sito, contenuto recuperato da Wayback Machine)",
+                                "active": True, "content_available": True,
+                                "source_type": f"{source_type} (Wayback Machine)"}, text
+                except Exception:
+                    pass
+            status += " (bloccata da verifica anti-bot: la pagina può essere raggiungibile da un browser umano)"
+        return {"url": url, "status": status, "active": False, "content_available": False}, None
+    except URLError:
+        return {"url": url, "status": "DNS / Irraggiungibile", "active": False, "content_available": False}, None
+    except UnsafeSourceURL as exc:
+        return {"url": url, "status": f"Redirect non consentito: {exc}", "active": False,
+                "content_available": False}, None
+    except Exception:
+        return {"url": url, "status": "Errore", "active": False, "content_available": False}, None
+
+    try:
+        text, source_type = _decode_body(body, content_type, charset, max_bytes)
+    except ValueError as exc:
+        return {"url": url, "status": f"{status} ({exc})", "active": True, "content_available": False}, None
+    except Exception:
+        return {"url": url, "status": f"{status} (contenuto non leggibile)", "active": True,
+                "content_available": False}, None
+    return {"url": url, "status": status, "active": True, "content_available": bool(text),
+            "source_type": source_type}, text or None
 
 
 def fetch_all(urls, deadline=8):
@@ -120,7 +254,8 @@ def fetch_all(urls, deadline=8):
         try:
             results.append(future.result(timeout=max(0.1, deadline - (time.perf_counter() - start))))
         except FuturesTimeout:
-            results.append(({"url": url, "status": "Timeout", "active": False}, None))
+            results.append(({"url": url, "status": "Timeout", "active": False,
+                             "content_available": False}, None))
     pool.shutdown(wait=False, cancel_futures=True)
     return [status for status, _ in results], {status["url"]: html for status, html in results}
 
@@ -165,6 +300,9 @@ def html_to_paragraphs(html):
     try:
         parser.feed(html)
         parser.close()
+        # Anche PDF e testo semplice passano da qui: senza tag HTML il buffer
+        # finale va materializzato, altrimenti una fonte leggibile risulta vuota.
+        parser._flush()
     except Exception:
         pass
     # rimuove le note tipo [12] di Wikipedia e i blocchi duplicati
@@ -401,7 +539,7 @@ def _has_checkable_numbers(text):
     return bool({n for n in _numbers(text) if n >= 10 or n != int(n)})
 
 
-def _ask_jev(client, claim, sources):
+def _ask_jev(client, claim, sources, source_description="citate"):
     """Una chiamata Jev per affermazione: verdetto sugli estratti (se ci sono) e plausibilità
     secondo la conoscenza generale, utile quando la fonte manca o non tratta il punto."""
     state = f"AFFERMAZIONE:\n{claim['text']}\n"
@@ -413,7 +551,7 @@ def _ask_jev(client, claim, sources):
         questions["numbers"] = Noul(instructions=NUMBER_QUESTION)
     if sources:
         questions["verdict"] = Choice(
-            instructions="Gli estratti delle fonti citate sostengono l'affermazione?",
+            instructions=f"Gli estratti delle fonti {source_description} sostengono l'affermazione?",
             criteria=VERDICTS,
         )
     response = client.system_one(state=state, model="jev-latest", questions=questions)
@@ -453,10 +591,10 @@ def _escalate(row):
 
 
 def verify_claims(client, claims, refs, pages):
-    """Verifica ogni affermazione. `pages` mappa URL -> HTML scaricato (None se irraggiungibile).
+    """Verifica ogni affermazione. `pages` mappa URL -> testo della fonte (None se irraggiungibile).
 
     Restituisce (righe, metriche Jev, metriche escalation)."""
-    paragraphs = {url: html_to_paragraphs(html) for url, html in pages.items() if html}
+    paragraphs = {url: html_to_paragraphs(content) for url, content in pages.items() if content}
 
     def check(claim):
         row = {"text": claim["text"], "kind": claim["kind"], "refs": claim["refs"], "verdict": None,
@@ -531,6 +669,69 @@ def verify_claims(client, claims, refs, pages):
     return rows, jev, escalation
 
 
+def verify_external_sources(client, claims, discovered_sources, pages):
+    """Verifica separatamente fonti trovate su richiesta dall'utente.
+
+    I risultati non confluiscono in `rate()`: chiariscono se un claim può essere
+    riscontrato altrove, ma non trasformano una bibliografia carente in una buona.
+    """
+    by_claim = {}
+    for source in discovered_sources:
+        by_claim.setdefault(source["claim_index"], []).append(source)
+
+    def check(item):
+        index, claim = item
+        sources = by_claim.get(index, [])
+        if not sources:
+            return None, None
+        query = claim["text"] + " " + " ".join(claim.get("keywords", []))
+        excerpts, displayed_sources = {}, []
+        for source in sources:
+            content = pages.get(source["url"]) or source.get("snippet", "")
+            excerpt = best_excerpt(query, html_to_paragraphs(content)) or source.get("snippet", "")[:EXCERPT_CHARS]
+            excerpts[source["id"]] = {"url": source["url"], "excerpt": excerpt}
+            displayed_sources.append({
+                "id": source["id"], "title": source["title"], "url": source["url"],
+                "authority": source["authority"],
+                "content_origin": "pagina" if pages.get(source["url"]) else "snippet di ricerca",
+            })
+        result = _ask_jev(client, claim, excerpts, source_description="esterne selezionate da Skepsis")
+        return {
+            "claim_index": index,
+            "claim": claim["text"],
+            "verdict": result.get("verdict", "Non trovata"),
+            "confidence": result.get("confidence"),
+            "world": result.get("world"),
+            "number_match": result.get("number_match"),
+            "sources": displayed_sources,
+        }, result
+
+    candidates = [(index, claim) for index, claim in enumerate(claims) if index in by_claim]
+    def safe_check(item):
+        try:
+            return check(item), None
+        except Exception as exc:
+            return (None, None), str(exc)
+
+    start = time.perf_counter()
+    checks, raw_results, errors = [], [], []
+    with ThreadPoolExecutor(max_workers=min(4, len(candidates) or 1)) as pool:
+        for (row, raw), error in pool.map(safe_check, candidates):
+            if error:
+                errors.append(error)
+            elif row:
+                checks.append(row)
+                raw_results.append(raw)
+    metrics = {
+        "calls": len(raw_results),
+        "seconds": round(time.perf_counter() - start, 3),
+        "input_tokens": sum(result["input_tokens"] for result in raw_results),
+        "output_tokens": sum(result["output_tokens"] for result in raw_results),
+        "errors": errors,
+    }
+    return checks, metrics
+
+
 def summarize(rows):
     """Riepilogo testuale dei verdetti, da passare alla valutazione globale e al LLM."""
     lines = []
@@ -578,21 +779,30 @@ def rate(rows, refs):
     facts = [r for r in checked if r["kind"] == "fatto"]
     conclusions = [r for r in checked if r["kind"] == "conclusione"]
 
-    # 1 stella: un fatto di base è falso (contraddetto dalle fonti e implausibile, o chiaramente falso)
+    # 1 stella: un fatto di base è chiaramente falso e implausibile
     for r in facts:
-        if (r["verdict"] == "Contraddetta" and world(r) < 0.5) or world(r) < 0.15:
+        if world(r) < 0.15:
             return 1, f"fatto falso: «{r['text']}»"
-    # 1 stella: un numero (data, quantità, misura) è diverso da quello riportato dalla fonte,
-    # e non è un fatto abbastanza noto perché Jev possa dirlo da solo
-    for r in facts:
-        if r.get("number_match") is not None and r["number_match"] < 0.35 and world(r) < 0.65:
-            return 1, f"numero alterato rispetto alla fonte: «{r['text']}»"
+    # 1 stella: più fatti contraddetti dalle fonti (problema sistemico, non un singolo errore isolato)
+    contradicted = [r for r in facts if r["verdict"] == "Contraddetta" and world(r) < 0.5]
+    if len(contradicted) >= 2:
+        return 1, f"più fatti contraddetti dalle fonti, tra cui: «{contradicted[0]['text']}»"
+    # 1 stella: più numeri (date, quantità, misure) diversi da quelli riportati dalle fonti,
+    # e non abbastanza noti perché Jev possa dirlo da solo
+    altered_numbers = [r for r in facts
+                        if r.get("number_match") is not None and r["number_match"] < 0.35 and world(r) < 0.65]
+    if len(altered_numbers) >= 2:
+        return 1, f"più numeri alterati rispetto alle fonti, tra cui: «{altered_numbers[0]['text']}»"
     # 1 stella: un fatto implausibile appoggiato solo a fonti irraggiungibili (citazione inventata)
     for r in checked:
-        if only_unreachable(r) and world(r) < 0.5:
+        if only_unreachable(r) and world(r) < 0.3:
             return 1, f"affermazione implausibile citata da una fonte irraggiungibile: «{r['text']}»"
 
-    # 2 stelle: fatti veri, ma conclusioni non giustificate o fonti distorte
+    # 2 stelle: un singolo fatto contraddetto o un numero alterato, isolato, o conclusioni non giustificate
+    if contradicted:
+        return 2, f"fatto contraddetto dalle fonti: «{contradicted[0]['text']}»"
+    if altered_numbers:
+        return 2, f"numero alterato rispetto alla fonte: «{altered_numbers[0]['text']}»"
     for r in conclusions:
         if r["verdict"] in ("Esagerata", "Contraddetta") or (r["verdict"] in UNVERIFIED and world(r) < 0.5) or world(r) < 0.15:
             return 2, f"conclusione non giustificata dalle fonti: «{r['text']}»"

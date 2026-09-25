@@ -97,7 +97,7 @@ def chat(prompt, model=None, reasoning=False, timeout=90, json_mode=False, tempe
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            "X-Title": "Verificatore Bibliografia",
+            "X-Title": "Skepsis",
         },
     )
     start = time.perf_counter()

@@ -1,4 +1,4 @@
-# @title 📊 Bibliography & Claim Verifier Dashboard {display-mode: "form"}
+# @title 📊 Skepsis — Bibliography & Claim Verifier {display-mode: "form"}
 import sys
 import subprocess
 
@@ -128,7 +128,7 @@ html_code = """
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Bibliography Verifier</title>
+    <title>Skepsis — Source verification</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -175,7 +175,7 @@ html_code = """
 </head>
 <body>
     <div class="dashboard-container">
-        <h2 class="mb-4" style="color: #1e1b4b; font-weight: 700;">📚 Live Bibliography & Claim Verifier</h2>
+        <h2 class="mb-4" style="color: #1e1b4b; font-weight: 700;">📚 Skepsis — Source & Claim Verifier</h2>
 
         <!-- Inputs -->
         <div class="card p-4">
@@ -345,4 +345,3 @@ html_code = """
 
 # Render dashboard directly within the Colab output pane
 HTML(html_code)
-

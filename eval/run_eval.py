@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["typesafe-sdk", "python-dotenv"]
+# dependencies = ["typesafe-sdk", "python-dotenv", "pypdf"]
 # ///
 """Misura quanto le stelle del verificatore concordano con le etichette di eval/dataset.jsonl.
 
@@ -8,13 +8,15 @@ Uso:
     uv run eval/run_eval.py [--only apollo11,curie] [--workers 3]
 
 Stampa accuratezza esatta, entro una stella, accordo buono/non buono (>= 3 stelle),
-errore medio, matrice di confusione, tempi e costi; salva i dettagli in eval/results.json.
+errore medio, matrice di confusione, tempi e costi; salva i dettagli in un file
+datato sotto eval/results/, senza sovrascrivere un benchmark precedente.
 """
 import argparse
 import json
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -30,10 +32,11 @@ def run_item(item):
 
 
 def main_eval():
-    parser = argparse.ArgumentParser(description="Valutazione del verificatore sul dataset etichettato")
+    parser = argparse.ArgumentParser(description="Valutazione di Skepsis sul dataset etichettato")
     parser.add_argument("--only", help="prefissi degli id da includere, separati da virgola")
     parser.add_argument("--workers", type=int, default=3, help="articoli verificati in parallelo")
     parser.add_argument("--dataset", default="dataset.jsonl", help="file in eval/ (es. test_dataset.jsonl)")
+    parser.add_argument("--output", help="percorso JSON esplicito; di default crea eval/results/<dataset>_<timestamp>.json")
     args = parser.parse_args()
 
     items = [json.loads(line) for line in open(HERE / args.dataset)]
@@ -86,8 +89,15 @@ def main_eval():
         if any(line):
             print(f"  {i + 1}★   " + " ".join(str(v).rjust(4) for v in line))
 
-    with open(HERE / args.dataset.replace(".jsonl", "_results.json"), "w") as f:
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        output_path = HERE / "results" / f"{Path(args.dataset).stem}_{stamp}.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
         json.dump(rows, f, ensure_ascii=False, indent=1)
+    print(f"\nDettagli salvati in {output_path}")
 
 
 if __name__ == "__main__":

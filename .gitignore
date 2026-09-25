@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .venv/
 eval/*_results.json
+eval/results/

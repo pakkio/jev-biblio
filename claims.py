@@ -40,6 +40,13 @@ MAX_ESCALATIONS = int(os.getenv("MAX_ESCALATIONS", "8"))
 MAX_CLAIMS = 20
 MAX_LINKS = 15
 EXCERPT_CHARS = 1500
+# Selezione degli estratti: "jev" fa scegliere a Jev i paragrafi pertinenti tra i candidati
+# trovati per parole chiave; "keywords" usa solo le parole chiave
+EXCERPT_SELECTION = os.getenv("EXCERPT_SELECTION", "jev")
+CANDIDATES = 12
+CANDIDATE_CHARS = 700
+RELEVANCE_THRESHOLD = 0.5
+MAX_SELECTED = 3
 
 STOPWORDS = set("""
 alla alle allo anche avere come con contro cosa così dalla dalle dallo degli della delle dello dopo dove
@@ -271,8 +278,8 @@ def _keywords(text):
     return weights
 
 
-def best_excerpt(query, paragraphs, max_chars=EXCERPT_CHARS):
-    """Sceglie i paragrafi della fonte che condividono più parole chiave con la ricerca."""
+def candidate_paragraphs(query, paragraphs, limit=CANDIDATES):
+    """I paragrafi della fonte che condividono più parole chiave e numeri con la ricerca."""
     keywords = _keywords(query)
     # i numeri interi piccoli (es. "5 strati") combaciano con troppi paragrafi
     numbers = {n for n in _numbers(query) if n >= 10 or n != int(n)}
@@ -284,8 +291,13 @@ def best_excerpt(query, paragraphs, max_chars=EXCERPT_CHARS):
         if score:
             scored.append((score / math.sqrt(1 + len(paragraph) / 400), index, paragraph))
     scored.sort(key=lambda s: (-s[0], s[1]))
+    return [paragraph for _, _, paragraph in scored[:limit]]
+
+
+def best_excerpt(query, paragraphs, max_chars=EXCERPT_CHARS):
+    """Selezione solo per parole chiave: i primi paragrafi candidati, fino a max_chars."""
     excerpt, used = [], 0
-    for _, _, paragraph in scored[:4]:
+    for paragraph in candidate_paragraphs(query, paragraphs, limit=4):
         piece = paragraph[: max_chars - used]
         excerpt.append(piece)
         used += len(piece)
@@ -295,6 +307,32 @@ def best_excerpt(query, paragraphs, max_chars=EXCERPT_CHARS):
 
 
 # --- Verifica -----------------------------------------------------------------------------------
+
+def _select_with_jev(client, claim, candidates):
+    """Una chiamata Jev con una domanda sì/no per ogni paragrafo candidato.
+
+    `candidates` è una lista di (riferimento, paragrafo). Restituisce l'estratto scelto per
+    ogni riferimento (vuoto se nessun paragrafo è pertinente) e i token usati."""
+    state = f"AFFERMAZIONE:\n{claim['text']}\n\nPARAGRAFI CANDIDATI DALLE FONTI:\n"
+    for i, (ref, paragraph) in enumerate(candidates):
+        state += f"\nP{i} (fonte [{ref}]): {paragraph[:CANDIDATE_CHARS]}\n"
+    questions = {
+        f"p{i}": Noul(instructions=f"Il paragrafo P{i} contiene informazioni che permettono di confermare "
+                                   "o smentire l'affermazione?")
+        for i in range(len(candidates))
+    }
+    response = client.system_one(state=state, model="jev-latest", questions=questions)
+    relevance = [(response.answers[f"p{i}"].noul, i) for i in range(len(candidates))]
+    chosen = sorted((i for p, i in relevance if p >= RELEVANCE_THRESHOLD),
+                    key=lambda i: -response.answers[f"p{i}"].noul)
+    excerpts = {ref: [] for ref, _ in candidates}
+    for i in chosen:
+        ref, paragraph = candidates[i]
+        if len(excerpts[ref]) < MAX_SELECTED:
+            excerpts[ref].append(paragraph[:CANDIDATE_CHARS])
+    return ({ref: "\n".join(parts) for ref, parts in excerpts.items()},
+            response.usage.input_tokens, response.usage.output_tokens)
+
 
 WORLD_QUESTION = ("Indipendentemente dagli estratti, l'affermazione è vera secondo le conoscenze storiche "
                   "e scientifiche consolidate?")
@@ -353,20 +391,30 @@ def verify_claims(client, claims, refs, pages):
     paragraphs = {url: html_to_paragraphs(html) for url, html in pages.items() if html}
 
     def check(claim):
-        query = claim["text"] + " " + " ".join(claim.get("keywords", []))
-        sources = {}
-        for ref in claim["refs"]:
-            url = refs[ref]["url"] if ref in refs else None
-            if url and paragraphs.get(url):
-                sources[ref] = {"url": url, "excerpt": best_excerpt(query, paragraphs[url])}
         row = {"text": claim["text"], "kind": claim["kind"], "refs": claim["refs"], "verdict": None,
-               "confidence": None, "decided_by": None, "reason": "",
-               "excerpts": {ref: s["excerpt"] for ref, s in sources.items()}}
+               "confidence": None, "decided_by": None, "reason": "", "excerpts": {}}
         if claim["kind"] == "opinione":
             return {**row, "verdict": OPINION}
         if claim["kind"] == "esperienza":
             return {**row, "verdict": EXPERIENCE}
+
+        query = claim["text"] + " " + " ".join(claim.get("keywords", []))
+        urls = {ref: refs[ref]["url"] for ref in claim["refs"] if ref in refs and paragraphs.get(refs[ref]["url"])}
+        extra_in, extra_out, calls = 0, 0, 1
+        if EXCERPT_SELECTION == "jev":
+            candidates = [(ref, p) for ref, url in urls.items() for p in candidate_paragraphs(query, paragraphs[url])]
+            chosen = {ref: "" for ref in urls}
+            if candidates:
+                chosen, extra_in, extra_out = _select_with_jev(client, claim, candidates)
+                calls = 2
+        else:
+            chosen = {ref: best_excerpt(query, paragraphs[url]) for ref, url in urls.items()}
+        sources = {ref: {"url": url, "excerpt": chosen.get(ref, "")} for ref, url in urls.items()}
+        row["excerpts"] = {ref: s["excerpt"] for ref, s in sources.items()}
+
         result = _ask_jev(client, claim, sources)
+        result.update(input_tokens=result["input_tokens"] + extra_in,
+                      output_tokens=result["output_tokens"] + extra_out, jev_calls=calls)
         if not sources:
             return {**row, **result, "verdict": UNREACHABLE if claim["refs"] else NO_SOURCE}
         return {**row, **result, "decided_by": "Jev", "jev_verdict": result["verdict"], "_sources": sources}
@@ -376,7 +424,7 @@ def verify_claims(client, claims, refs, pages):
         rows = list(pool.map(check, claims))
     jev_rows = [r for r in rows if r.get("input_tokens")]
     jev = {
-        "calls": len(jev_rows),
+        "calls": sum(r.get("jev_calls", 1) for r in jev_rows),
         "seconds": round(time.perf_counter() - start, 3),
         "input_tokens": sum(r["input_tokens"] for r in jev_rows),
         "output_tokens": sum(r["output_tokens"] for r in jev_rows),
@@ -410,7 +458,7 @@ def verify_claims(client, claims, refs, pages):
         escalation["seconds"] = round(time.perf_counter() - start, 3)
 
     for row in rows:
-        for key in ("_sources", "probabilities", "input_tokens", "output_tokens"):
+        for key in ("_sources", "probabilities", "input_tokens", "output_tokens", "jev_calls"):
             row.pop(key, None)
     return rows, jev, escalation
 

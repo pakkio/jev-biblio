@@ -39,7 +39,7 @@ Senza `OPENROUTER_API_KEY` la dashboard funziona in modalità ridotta: divide l'
 |---|---|---|
 | 1. Link e fonti | Python | Scarica in parallelo fino a 15 URL, con un tetto complessivo di 8 s, ed estrae i paragrafi di testo. |
 | 2. Estrazione | LLM (`gpt-6-luna`) | Divide l'articolo in affermazioni atomiche: **fatto**, **conclusione** dell'autore ("quindi", "dimostra che"), **opinione** o **esperienza** in prima persona. Per ognuna indica le fonti e le parole chiave in italiano e inglese. |
-| 3. Estratti | Python | Per ogni fatto sceglie i paragrafi delle fonti che condividono parole chiave e numeri, confrontati per valore: "4.700" corrisponde a "4.7k". |
+| 3. Estratti | Python + Jev | Per ogni affermazione trova fino a 12 paragrafi candidati per fonte, per parole chiave e numeri confrontati per valore ("4.700" corrisponde a "4.7k"). Poi Jev, con una domanda sì/no per paragrafo in un'unica chiamata, sceglie quelli che servono davvero a confermare o smentire. |
 | 4. Verifica | Jev, una chiamata per affermazione, in parallelo | Decide se gli estratti sostengono l'affermazione, con quale confidenza, e quanto è plausibile secondo la conoscenza generale. La plausibilità conta quando la fonte manca o non tratta il punto. |
 | 5. Casi incerti | LLM che ragiona (`gpt-6-luna-pro`) | Solo se la confidenza di Jev è sotto l'80%: rilegge affermazione ed estratti e decide, con una frase di motivazione. |
 | 6. Voto | regole + Jev | Le stelle si calcolano con le regole qui sotto. Jev dà anche pertinenza, aderenza e un voto globale (`Score`), mostrati come informazione e usati come riserva se l'articolo non contiene fatti verificabili. |
@@ -108,7 +108,10 @@ Risultati di settembre 2026:
 | Tempo medio | 5 s | 16,5 s | 14,4 s | 11,2 s |
 | Costo medio | 0,019 ¢ | 0,196 ¢ | 0,202 ¢ | 0,118 ¢ |
 
+**Selezione degli estratti con Jev** (`EXCERPT_SELECTION=jev`, predefinita): rispetto alla sola ricerca per parole chiave, le affermazioni "Non trovata" nel set di test scendono dal 17% al 12% e le "Sostenuta" salgono dal 49% al 51%. Il voto in stelle non cambia (sviluppo 95%, test 94-100%) e il costo cresce del 10-30%. Il guadagno è negli estratti mostrati per ogni affermazione, più pertinenti.
+
 **Come leggerli:**
+- **Variabilità:** tra un'esecuzione e l'altra il risultato può cambiare di un articolo, soprattutto sui fuorvianti al confine tra 1★ e 2★. L'estrazione del LLM a volte marca come "fatto" una parte di una conclusione.
 - **Chi ha scritto le etichette:** entrambi i set sono stati scritti ed etichettati da chi ha sviluppato le regole, con tre categorie nette. Il test su articoli mai visti riduce il rischio di aver adattato le regole ai dati, ma non lo elimina.
 - **Margine statistico:** con 18 articoli, un 100% è compatibile con una precisione reale intorno all'85-90%.
 - **Articoli reali:** quelli veri sono più sfumati (errori isolati in articoli buoni, opinioni mescolate ai fatti) e il confine tra 3★, 4★ e 5★ è meno netto di quello tra falso e fuorviante.
@@ -124,6 +127,7 @@ Risultati di settembre 2026:
 | `ESCALATION_MODEL` | `openai/gpt-6-luna-pro` | modello che ragiona sui casi incerti |
 | `ESCALATION_THRESHOLD` | `0.8` | sotto questa confidenza di Jev il caso passa al LLM |
 | `MAX_ESCALATIONS` | `8` | massimo di casi incerti passati al LLM per articolo |
+| `EXCERPT_SELECTION` | `jev` | `jev`: Jev sceglie i paragrafi pertinenti; `keywords`: solo parole chiave, più economico |
 | `JEV_PRICE_PER_M_INPUT` | `0.042` | prezzo Jev in USD per milione di token di input |
 
 Se il modello scelto su OpenRouter non risponde, si passa al Gemini Flash Lite più recente con versione ≥ 3.5 e poi a `openrouter/free`. La tabella *Tempi e costi* mostra quale modello ha risposto davvero.

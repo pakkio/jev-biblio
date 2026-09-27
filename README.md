@@ -12,7 +12,7 @@ Dashboard web locale che controlla se un articolo è davvero sostenuto dalle sue
 - **assegna da 1 a 5 stelle con regole esplicite** sui verdetti, mostrando il motivo, e **scrive una giustificazione in italiano**;
 - **mostra tempi e costi** di ogni passaggio, con il totale in centesimi.
 
-Una verifica completa costa in media **0,1-0,2 ¢** e richiede **10-40 secondi**, a seconda della lunghezza dell'articolo. Ultima esecuzione (settembre 2026): 100% sul set di test, 86% sul set di sviluppo (vedi [Valutazione](#valutazione) per i numeri completi e perché sono scesi rispetto a versioni precedenti).
+Una verifica completa costa in media **0,1-0,2 ¢** e richiede **10-40 secondi**, a seconda della lunghezza dell'articolo. Ultima esecuzione (settembre 2026): 100% sul set di test, 90% sul set di sviluppo (vedi [Valutazione](#valutazione) per i numeri completi, per la regressione del 27 settembre e per cosa significa ormai "test" — non è più un set indipendente).
 
 ## Avvio rapido
 
@@ -127,18 +127,22 @@ Ogni esecuzione salva i dettagli in `eval/results/` con un timestamp, quindi un 
 
 Risultati di settembre 2026:
 
-| | Voto globale Jev (v1) | Per affermazione, voto Jev (v2) | Per affermazione + regole (v3) | v3 + estratti Jev, estrazione a blocchi, controllo numeri (v4) | dopo la correzione del 27/9 (v5, sotto) |
-|---|---|---|---|---|---|
-| Stelle esatte, sviluppo | 62% | 71% | 95% | 90-95%* | 86% |
-| Entro una stella, sviluppo | — | — | — | — | 95% |
-| Stelle esatte, **test** | — | — | 100% | 100% | 100% |
-| Tempo medio, sviluppo | 5 s | 16,5 s | 14,4 s | 17,1 s | 12,4 s |
-| Tempo medio, **articolo lungo** (~9.000 caratteri) | — | — | 20,8 s (estrazione) | **11,6 s** (estrazione, -44%) | — |
-| Costo medio, sviluppo | 0,019 ¢ | 0,196 ¢ | 0,202 ¢ | 0,225 ¢ | 0,222 ¢ |
+| | Voto globale Jev (v1) | Per affermazione, voto Jev (v2) | Per affermazione + regole (v3) | v3 + estratti Jev, estrazione a blocchi, controllo numeri (v4) | bug del 27/9 pomeriggio (v4.5, prima della correzione sotto) | dopo la correzione del 27/9 (v5) | dopo controllo numeri per soggetto + link rot (v5.1) |
+|---|---|---|---|---|---|---|---|
+| Stelle esatte, sviluppo | 62% | 71% | 95% | 90-95%* | 81% (17/21) | 86% (18/21) | 90% (19/21) |
+| Entro una stella, sviluppo | — | — | — | — | 90% | 95% | 95% |
+| Stelle esatte, **test** | — | — | 100% | 100% | **89% (16/18)** | 100% (18/18) | 100% (18/18) |
+| Tempo medio, sviluppo | 5 s | 16,5 s | 14,4 s | 17,1 s | — | 12,4 s | 12,4 s |
+| Tempo medio, **articolo lungo** (~9.000 caratteri) | — | — | 20,8 s (estrazione) | **11,6 s** (estrazione, -44%) | — | — | — |
+| Costo medio, sviluppo | 0,019 ¢ | 0,196 ¢ | 0,202 ¢ | 0,225 ¢ | — | 0,222 ¢ | 0,234 ¢ |
 
 *\*Ho visto oscillare lo stesso articolo tra 3★ e 4★ da un'esecuzione all'altra (Grande muraglia, versione corretta): la selezione degli estratti fatta da Jev non è deterministica, quindi a volte sceglie un paragrafo diverso e il verdetto cambia. Non è una regressione di questa versione — l'ho verificato rilanciando lo stesso articolo tre volte.*
 
-**Il calo dal 100% al 86% sul set di sviluppo (27 settembre 2026) è una regressione misurata, non rumore, e vale la pena spiegarla.** Una correzione per togliere un falso positivo (una fonte vera ma bloccata da un sito, tipo un 401 su un repository gated, faceva scattare "1★ molto falso" solo perché Jev non riconosceva un fatto tecnico recente) ha per un breve periodo reso il verificatore troppo indulgente: un articolo con **zero affermazioni confermate su quattro** (Grande muraglia, versione falsa) veniva votato "3★ Buono" invece di "1★ Molto falso", perché l'unico segnale che lo intercettava (la sola implausibilità di Jev, senza altra prova) era stato tolto insieme al falso positivo. È il compromesso classico tra falsi positivi e falsi negativi: la correzione seguente (stessa giornata) ha richiesto **due segnali indipendenti d'accordo** — un'evidenza reale (fonte che contraddice, o citazione a una fonte che non esiste) più l'implausibilità di Jev — invece di uno solo, e ha anche fermato le regole dal dichiarare un voto "dalle regole" quando il campione è troppo piccolo (meno di 3 affermazioni verificabili) o non c'è alcuna prova a favore (0% confermato): in questi casi il voto è affidato al voto globale di Jev invece che a una regola che non ha materiale per decidere.
+**La regressione misurata del 27 settembre 2026 è stata sul set di test, non sullo sviluppo, ed è la colonna v4.5 sopra.** Il set di sviluppo non era mai stato al 100%: la sua traiettoria è 62% → 71% → 95% → 90-95% → 81% → 86%, con oscillazioni note (nota\* sopra). Il test invece era stabile al 100% dalle versioni v3-v4, ed è sceso a **89% (16/18)** — `penicillina-false` votato 2★ invece di 1★, `titanic-misleading` votato 4★ invece di 2★ — a causa di una correzione fatta poche ore prima per togliere un falso positivo (una fonte vera ma bloccata, tipo un 401 su un repository gated, faceva scattare "1★ molto falso" solo perché Jev non riconosceva un fatto tecnico recente): quella correzione aveva tolto l'unico segnale che intercettava un fatto contraddetto ma isolato, o un campione troppo piccolo per un voto affidabile. È il compromesso classico tra falsi positivi e falsi negativi. I dettagli di quella run (16/18) restano in `eval/results/test_dataset_20260927T154511Z.json`, non cancellati. La correzione seguente (stessa giornata, v5) ha richiesto **due segnali indipendenti d'accordo** — un'evidenza reale (fonte che contraddice, o citazione a una fonte che non esiste) più l'implausibilità di Jev — invece di uno solo, e ha anche fermato le regole dal dichiarare un voto "dalle regole" quando il campione è troppo piccolo (meno di 3 affermazioni verificabili) o non c'è alcuna prova a favore (0% confermato): in questi casi il voto è affidato al voto globale di Jev invece che a una regola che non ha materiale per decidere. Questo ha riportato il test al 100% (18/18) e portato lo sviluppo da 81% a 86%.
+
+**Il 100% sul test, a questo punto, non è più un risultato su dati indipendenti.** Due dei tre casi che l'hanno riportato al 100% (`penicillina-false`, `titanic-misleading`) sono stati usati per scoprire e correggere il bug appena descritto: contano come accuratezza su dati già usati per tarare le regole, non come una valutazione alla cieca (vedi anche la nota sul set di test, sopra).
+
+**v5.1** ha corretto due falsi allarmi nuovi scoperti su `jwst-misleading` (era finito a 1★ invece di 2★): il controllo sui numeri ora chiede esplicitamente a Jev di confrontare il numero solo con lo stesso soggetto (una temperatura riferita "agli strumenti" in generale non è contraddetta da una temperatura diversa di un singolo componente citato a parte negli estratti); e un 404/410, o un DNS che non risolve più, viene ora ritentato su Wayback Machine prima di essere trattato come "citazione inventata" o fonte "Inaffidabile" — un link rotto (fonte vera, spostata o rimossa) non è la stessa cosa di una fonte mai esistita. `jwst-clean` resta un miss noto e non deterministico (oscilla tra 4★ e 2★ sullo stesso identico claim, la data di luglio 2022 dedotta ma non scritta nella fonte): i dettagli dei mismatch sono ora salvati nel JSON di valutazione (`eval/results/`), non solo il motivo testuale, per poterli rivedere.
 
 **Come leggerli:**
 - **Variabilità:** oltre al caso sopra, gli articoli fuorvianti al confine tra 1★ e 2★ possono cambiare risultato da un'esecuzione all'altra (es. Galileo fuorviante: 2★, 1★, 1★ su tre run; il telescopio Webb, versione corretta, ha oscillato tra 4★ e 2★ per lo stesso motivo — un singolo controllo sui numeri vicino alla soglia). L'estrazione del LLM a volte marca come "fatto" una parte di una conclusione.

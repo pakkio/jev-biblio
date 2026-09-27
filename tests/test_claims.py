@@ -47,6 +47,49 @@ class SourceUrlValidationTests(unittest.TestCase):
         self.assertIsNone(text)
 
 
+class LinkRotRecoveryTests(unittest.TestCase):
+    def test_source_likely_nonexistent_classifies_by_status(self):
+        self.assertTrue(claims._source_likely_nonexistent("404"))
+        self.assertTrue(claims._source_likely_nonexistent("410"))
+        self.assertTrue(claims._source_likely_nonexistent("DNS / Irraggiungibile"))
+        self.assertTrue(claims._source_likely_nonexistent("URL non consentito: host non risolvibile"))
+        self.assertFalse(claims._source_likely_nonexistent("401"))
+        self.assertFalse(claims._source_likely_nonexistent("200"))
+        self.assertFalse(claims._source_likely_nonexistent(
+            "404 (pagina non più disponibile, contenuto recuperato da Wayback Machine)"))
+
+    @patch("claims._validate_source_url", side_effect=lambda url: url)
+    @patch("claims._wayback_snapshot_url")
+    @patch("claims._download_raw")
+    def test_a_404_is_recovered_from_wayback_and_not_treated_as_invented(
+            self, download_raw, wayback_url, _validate):
+        download_raw.side_effect = [
+            ("404", "text/html", b"not found", "utf-8", {}),
+            ("200", "text/html", b"<p>Contenuto storico abbastanza lungo da essere utile davvero.</p>",
+             "utf-8", {}),
+        ]
+        wayback_url.return_value = "https://web.archive.org/web/2020/https://example.org/moved"
+
+        status, text = claims.fetch_page("https://example.org/moved")
+
+        self.assertTrue(status["active"])
+        self.assertTrue(status["content_available"])
+        self.assertIn("Wayback Machine", status["status"])
+        self.assertIn("Contenuto storico", text)
+        self.assertFalse(claims._source_likely_nonexistent(status["status"]))
+
+    @patch("claims._validate_source_url", side_effect=lambda url: url)
+    @patch("claims._wayback_snapshot_url", return_value=None)
+    @patch("claims._download_raw", return_value=("404", "text/html", b"not found", "utf-8", {}))
+    def test_a_404_without_a_wayback_snapshot_stays_likely_invented(
+            self, _download_raw, _wayback_url, _validate):
+        status, text = claims.fetch_page("https://example.org/never-existed")
+
+        self.assertFalse(status["active"])
+        self.assertIsNone(text)
+        self.assertTrue(claims._source_likely_nonexistent(status["status"]))
+
+
 class HtmlExtractionTests(unittest.TestCase):
     def test_html_extraction_skips_navigation_and_keeps_content(self):
         html = "<nav>menu non rilevante</nav><p>Una fonte contiene abbastanza testo da essere utile.</p>"

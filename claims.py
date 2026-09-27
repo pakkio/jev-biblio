@@ -432,11 +432,27 @@ def _wayback_snapshot_url(url, timeout=6):
     return None
 
 
+def _try_wayback(url, timeout, max_bytes):
+    """Tenta di recuperare un URL da Wayback Machine. Restituisce (tipo, testo) o None."""
+    snapshot_url = _wayback_snapshot_url(url)
+    if not snapshot_url:
+        return None
+    try:
+        _validate_source_url(snapshot_url)
+        _, snap_type, snap_body, snap_charset, _ = _download_raw(snapshot_url, timeout, max_bytes)
+        text, source_type = _decode_body(snap_body, snap_type, snap_charset, max_bytes)
+        return (source_type, text) if text else None
+    except Exception:
+        return None
+
+
 def fetch_page(url, timeout=8, max_bytes=MAX_SOURCE_BYTES):
     """Scarica HTML, testo o PDF; blocca URL privati e contenuti troppo grandi.
 
-    Se il sito blocca la richiesta con una verifica anti-bot (es. sfida Cloudflare),
-    tenta di recuperare l'ultimo snapshot da Wayback Machine come riserva.
+    Se il sito blocca la richiesta con una verifica anti-bot (es. sfida Cloudflare), la fonte
+    è DNS-irraggiungibile, o restituisce 404/410 (probabile link rot), tenta di recuperare
+    l'ultimo snapshot da Wayback Machine come riserva: una fonte recuperata così è esistita
+    davvero, anche se ora non è raggiungibile direttamente.
     """
     try:
         _validate_source_url(url)
@@ -446,6 +462,12 @@ def fetch_page(url, timeout=8, max_bytes=MAX_SOURCE_BYTES):
     try:
         status, content_type, body, charset, headers = _download_raw(url, timeout, max_bytes)
     except URLError:
+        recovered = _try_wayback(url, timeout, max_bytes)
+        if recovered:
+            source_type, text = recovered
+            return {"url": url, "status": "DNS / Irraggiungibile (contenuto recuperato da Wayback Machine)",
+                    "active": True, "content_available": True,
+                    "source_type": f"{source_type} (Wayback Machine)"}, text
         return {"url": url, "status": "DNS / Irraggiungibile", "active": False, "content_available": False}, None
     except UnsafeSourceURL as exc:
         return {"url": url, "status": f"Redirect non consentito: {exc}", "active": False,
@@ -458,21 +480,21 @@ def fetch_page(url, timeout=8, max_bytes=MAX_SOURCE_BYTES):
         server = (headers.get("Server") or headers.get("server") or "").lower()
         blocked_by_bot_check = code in (403, 503) and (
             "cloudflare" in server or headers.get("cf-mitigated") or headers.get("Cf-Mitigated"))
-        if blocked_by_bot_check:
-            snapshot_url = _wayback_snapshot_url(url)
-            if snapshot_url:
-                try:
-                    _validate_source_url(snapshot_url)
-                    _, snap_type, snap_body, snap_charset, _ = _download_raw(snapshot_url, timeout, max_bytes)
-                    text, source_type = _decode_body(snap_body, snap_type, snap_charset, max_bytes)
-                    if text:
-                        return {"url": url,
-                                "status": f"{status} (bloccata dal sito, contenuto recuperato da Wayback Machine)",
-                                "active": True, "content_available": True,
-                                "source_type": f"{source_type} (Wayback Machine)"}, text
-                except Exception:
-                    pass
-            status += " (bloccata da verifica anti-bot: la pagina può essere raggiungibile da un browser umano)"
+        # Un 404/410 è spesso "link rot" (la pagina è stata spostata o rimossa, ma è esistita
+        # davvero) e non una citazione inventata: vale la pena controllare Wayback anche qui,
+        # non solo quando un sito blocca esplicitamente le richieste automatiche.
+        link_rot = code in (404, 410)
+        if blocked_by_bot_check or link_rot:
+            recovered = _try_wayback(url, timeout, max_bytes)
+            if recovered:
+                source_type, text = recovered
+                reason = "bloccata dal sito" if blocked_by_bot_check else "pagina non più disponibile"
+                return {"url": url,
+                        "status": f"{status} ({reason}, contenuto recuperato da Wayback Machine)",
+                        "active": True, "content_available": True,
+                        "source_type": f"{source_type} (Wayback Machine)"}, text
+            if blocked_by_bot_check:
+                status += " (bloccata da verifica anti-bot: la pagina può essere raggiungibile da un browser umano)"
         return {"url": url, "status": status, "active": False, "content_available": False}, None
 
     try:
@@ -776,10 +798,15 @@ WORLD_QUESTION = ("Indipendentemente dagli estratti, l'affermazione è vera seco
                   "e scientifiche consolidate? Se descrive un evento recente, tecnico o di nicchia che potresti "
                   "semplicemente non conoscere, non è automaticamente implausibile: rispondi 'implausibile' solo "
                   "se contraddice fatti consolidati o è internamente inverosimile, non solo perché non la riconosci.")
-NUMBER_QUESTION = ("L'affermazione contiene numeri (date, quantità, misure). Gli estratti contengono "
-                   "almeno uno di quei numeri, esattamente com'è nell'affermazione o con un arrotondamento "
-                   "normale (es. 8.849 e circa 8.850 contano uguali)? Rispondi no se gli estratti riportano "
-                   "un numero diverso per lo stesso dato, o se non contengono affatto quel numero.")
+NUMBER_QUESTION = ("L'affermazione contiene numeri (date, quantità, misure). Prima individua a quale "
+                   "soggetto specifico si riferisce ciascun numero (es. \"gli strumenti\" in generale, "
+                   "oppure un singolo componente o strumento citato a parte). Gli estratti contengono, "
+                   "per lo STESSO soggetto, lo stesso numero (con un arrotondamento normale, es. 8.849 "
+                   "e circa 8.850 contano uguali)? Se gli estratti riportano un numero diverso ma per un "
+                   "soggetto diverso o più specifico (es. la temperatura di un singolo strumento quando "
+                   "l'affermazione parla degli strumenti in generale), questo NON conta come un numero "
+                   "alterato: rispondi sì. Rispondi no solo se gli estratti danno un numero chiaramente "
+                   "diverso per lo stesso identico soggetto, o non contengono affatto quel numero.")
 
 
 def _has_checkable_numbers(text):
@@ -845,8 +872,14 @@ def _source_likely_nonexistent(status):
 
     L'host che non risolve viene segnalato in due punti diversi (il controllo SSRF in
     _validate_source_url e il fallimento della richiesta in _download_raw), con testi diversi:
-    entrambi contano."""
+    entrambi contano.
+
+    Un DNS/404/410 recuperato da Wayback Machine (vedi fetch_page/_try_wayback) NON conta:
+    se un vecchio snapshot esiste, la fonte è esistita davvero, non è stata inventata — è solo
+    link rot, ed è comunque leggibile per verificare l'affermazione."""
     if not status:
+        return False
+    if "Wayback Machine" in status:
         return False
     if "risolvibile" in status or status.startswith("DNS"):
         return True

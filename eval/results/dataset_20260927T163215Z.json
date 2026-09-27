@@ -1,0 +1,758 @@
+[
+ {
+  "id": "apollo11-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 3.84,
+  "confidence": 0.67,
+  "counts": {
+   "Sostenuta": 5,
+   "Esagerata": 1,
+   "Parzialmente sostenuta": 3,
+   "Non trovata": 2
+  },
+  "reason": "8 affermazioni su 11 confermate dalle fonti",
+  "seconds": 16.7,
+  "cents": 0.4855224
+ },
+ {
+  "id": "apollo11-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.51,
+  "confidence": 0.58,
+  "counts": {
+   "Sostenuta": 3,
+   "Non trovata": 4,
+   "Opinione": 1
+  },
+  "reason": "⚠️ conclusione non giustificata dalle fonti: «La quarantena degli astronauti dell’Apollo 11 prova che la NASA sapeva che sulla Luna esistevano microrganismi pericolosi.» [2]",
+  "seconds": 9.9,
+  "cents": 0.18112040000000001
+ },
+ {
+  "id": "apollo11-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 0.99,
+  "counts": {
+   "Non trovata": 2,
+   "Contraddetta": 4,
+   "Esagerata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «La missione Apollo 11 aveva un equipaggio di quattro astronauti.» [1]\n⚠️ «Buzz Aldrin fu il primo uomo a mettere piede sulla Luna.» [1][2]\n⚠️ «Michael Collins mise piede sulla Luna dopo Buzz Aldrin.» [1][2]\n⚠️ «Gli astronauti di Apollo 11 rimasero sulla superficie lunare per due settimane.» [2]",
+  "seconds": 10.8,
+  "cents": 0.2292158
+ },
+ {
+  "id": "curie-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.31,
+  "confidence": 0.64,
+  "counts": {
+   "Sostenuta": 7
+  },
+  "reason": "7 affermazioni su 7 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 8.7,
+  "cents": 0.1467836
+ },
+ {
+  "id": "curie-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 2.02,
+  "confidence": 0.92,
+  "counts": {
+   "Sostenuta": 4,
+   "Senza fonte": 1,
+   "Opinione": 1
+  },
+  "reason": "⚠️ conclusione non giustificata dalle fonti: «La morte di Marie Curie dimostra che la ricerca sulla radioattività è intrinsecamente mortale per chiunque la pratichi.»",
+  "seconds": 8.3,
+  "cents": 0.1029216
+ },
+ {
+  "id": "curie-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 0.99,
+  "counts": {
+   "Contraddetta": 4,
+   "Non trovata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Marie Curie nacque a Parigi nel 1880.» [1]\n⚠️ «Marie Curie vinse tre premi Nobel.» [2]\n⚠️ «Tutti e tre i premi Nobel vinti da Marie Curie erano per la fisica.» [2]\n⚠️ «La scoperta più importante di Marie Curie fu l'uranio.» [1][2]",
+  "seconds": 9.9,
+  "cents": 0.152213
+ },
+ {
+  "id": "pisa-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 3.87,
+  "confidence": 0.78,
+  "counts": {
+   "Sostenuta": 5,
+   "Parzialmente sostenuta": 2,
+   "Non trovata": 2
+  },
+  "reason": "7 affermazioni su 9 confermate dalle fonti",
+  "seconds": 15.4,
+  "cents": 0.4466526
+ },
+ {
+  "id": "pisa-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.63,
+  "confidence": 0.68,
+  "counts": {
+   "Sostenuta": 2,
+   "Non trovata": 3
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «La Torre di Pisa è ormai perfettamente stabile.» [2]\n⚠️ «Il problema della Torre di Pisa è risolto per sempre.» [2]",
+  "seconds": 6.4,
+  "cents": 0.0971774
+ },
+ {
+  "id": "pisa-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 0.99,
+  "counts": {
+   "Non trovata": 1,
+   "Contraddetta": 3,
+   "Esagerata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «La Torre di Pisa fu costruita in soli cinque anni.» [1]\n⚠️ «La Torre di Pisa fu costruita dal 1350 al 1355.» [1]\n⚠️ «L'inclinazione della Torre di Pisa fu voluta dagli architetti per stupire i visitatori.» [2]",
+  "seconds": 10.0,
+  "cents": 0.1418276
+ },
+ {
+  "id": "muraglia-clean",
+  "expected": 4,
+  "got": 3,
+  "value": 3.48,
+  "confidence": 0.54,
+  "counts": {
+   "Non trovata": 2,
+   "Parzialmente sostenuta": 1,
+   "Sostenuta": 1
+  },
+  "reason": "solo 2 affermazioni su 4 confermate dalle fonti",
+  "seconds": 9.9,
+  "cents": 0.1811122,
+  "claims": [
+   {
+    "text": "La Grande muraglia cinese è un insieme di fortificazioni costruite nell'arco di molti secoli.",
+    "kind": "fatto",
+    "refs": [
+     "1"
+    ],
+    "verdict": "Non trovata",
+    "confidence": null,
+    "decided_by": "LLM",
+    "reason": "L’estratto riporta soltanto una citazione bibliografica e non descrive la Grande muraglia né il periodo in cui fu costruita.",
+    "excerpts": {
+     "1": "1 2 3 4 (EN) Julia Lovell, The Great Wall: China against the world 1000 BC - 2000 AD, Sydney, Picador Pan Macmillan, 2006, pp. 15-21."
+    },
+    "world": 0.97,
+    "jev_verdict": "Non trovata",
+    "verdict_label": "Non trovata"
+   },
+   {
+    "text": "La maggior parte dei tratti oggi visibili della Grande muraglia cinese risale alla dinastia Ming.",
+    "kind": "fatto",
+    "refs": [
+     "1",
+     "2"
+    ],
+    "verdict": "Parzialmente sostenuta",
+    "confidence": null,
+    "decided_by": "LLM",
+    "reason": "La fonte afferma che i tratti più noti furono costruiti durante la dinastia Ming e ne quantifica l’estensione, ma non dice esplicitamente che la maggior parte dei tratti oggi visibili risalga a quel periodo.",
+    "excerpts": {
+     "1": "",
+     "2": "In 2012, based on existing research and the results of a comprehensive mapping survey, the National Cultural Heritage Administration of China concluded that the remaining Great Wall associated sites include 10,051 wall sections, 1,764 ramparts or trenches, 29,510 individual buildings, and 2,211 fortifications or passes, with the walls and trenches spanning a total length of 21,196.18 km (13,170.70 mi). It was further concluded that the Ming Great Wall measures 8,850 km (5,500 mi). This consists of 6,259 km (3,889 mi) of wall sections, 359 km (223 mi) of trenches and 2,232 km (1,387 mi) of natural defensive barriers such as hills and rivers. In addition, Qin, Han and earlier Great Wall sites \nThe Great Wall of China is a series of fortifications in China. They were built across the historical northern borders of ancient Chinese states and Imperial China as protection against various nomadic groups from the Eurasian Steppe. The first walls date to the 7th century BC; these were joined together in the Qin dynasty. Successive dynasties expanded the wall system; the best-known sections were built by the Ming dynasty (1368–1644).\nUnlike the earlier fortifications, the Ming construction was stronger and more elaborate, due to the use of bricks and stone instead of rammed earth. Up to 25,000 watchtowers are estimated to have been constructed on the wall. As Mongol raids continued periodically over the years, the Ming devoted considerable resources to repair and reinforce the walls; sections near the Ming capital of Beijing were especially strong. Under general Qi Jiguang's supervision, 1,200 watchtowers from Shanhaiguan Pass to Changping were constructed between 1567 and 1570, and sections of the ram-earth wall were faced with bricks."
+    },
+    "world": 0.86,
+    "jev_verdict": "Parzialmente sostenuta",
+    "verdict_label": "Parzialmente sostenuta"
+   },
+   {
+    "text": "La Grande muraglia cinese è stata dichiarata patrimonio dell'umanità dall'UNESCO nel 1987.",
+    "kind": "fatto",
+    "refs": [
+     "1"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "1": "La Grande Muraglia (長城T, 长城S, ChángchéngP), nata come Wanli changcheng (萬里長城T, 万里长城S, Wànlǐ ChángchéngP, Grande Muraglia di 10 000 Lǐ), consiste in una lunghissima serie di mura situate nell'odierna Cina. È stata dichiarata dall'UNESCO patrimonio dell'umanità nel 1987 e inserita nel 2007 fra le sette meraviglie del mondo moderno."
+    },
+    "world": 0.97,
+    "number_match": 0.97,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "La Grande muraglia cinese non è visibile a occhio nudo dalla Luna, contrariamente a una leggenda diffusa.",
+    "kind": "fatto",
+    "refs": [
+     "2"
+    ],
+    "verdict": "Non trovata",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "2": ""
+    },
+    "world": 0.94,
+    "jev_verdict": "Non trovata",
+    "verdict_label": "Non trovata"
+   }
+  ]
+ },
+ {
+  "id": "muraglia-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.4,
+  "confidence": 0.66,
+  "counts": {
+   "Sostenuta": 1,
+   "Non trovata": 3
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «È confermato che la Grande Muraglia cinese è la costruzione umana più visibile dallo spazio.» [2]\n⚠️ «La Grande Muraglia cinese è riconoscibile anche dalla Luna.» [2]",
+  "seconds": 6.8,
+  "cents": 0.0774938
+ },
+ {
+  "id": "muraglia-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.02,
+  "confidence": 0.99,
+  "counts": {
+   "Non trovata": 4
+  },
+  "reason": "nessuna affermazione confermata dalle fonti: voto affidato alla valutazione globale di Jev",
+  "seconds": 16.5,
+  "cents": 0.2451422
+ },
+ {
+  "id": "fotosintesi-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.26,
+  "confidence": 0.57,
+  "counts": {
+   "Sostenuta": 5
+  },
+  "reason": "5 affermazioni su 5 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 6.9,
+  "cents": 0.13474440000000001
+ },
+ {
+  "id": "fotosintesi-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.14,
+  "confidence": 0.89,
+  "counts": {
+   "Opinione": 1,
+   "Sostenuta": 1,
+   "Non trovata": 2,
+   "Contraddetta": 1
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «La produzione di una parte importante dell'ossigeno atmosferico da parte del fitoplancton marino dimostra che le foreste non hanno alcun ruolo nel ciclo dell'ossigeno.» [2]\n⚠️ «La produzione di una parte importante dell'ossigeno atmosferico da parte del fitoplancton marino dimostra che disboscare non ha conseguenze sull'atmosfera.» [2]",
+  "seconds": 13.7,
+  "cents": 0.2075826
+ },
+ {
+  "id": "fotosintesi-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.0,
+  "confidence": 1.0,
+  "counts": {
+   "Contraddetta": 5,
+   "Esagerata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Durante la fotosintesi le piante assorbono ossigeno.» [1]\n⚠️ «Durante la fotosintesi le piante rilasciano anidride carbonica.» [1]\n⚠️ «La fotosintesi avviene nei mitocondri.» [2]\n⚠️ «La clorofilla si trova nei mitocondri.» [2]\n⚠️ «La fotosintesi può avvenire solo di notte.» [1][2]",
+  "seconds": 11.9,
+  "cents": 0.1906794
+ },
+ {
+  "id": "python-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.68,
+  "confidence": 0.73,
+  "counts": {
+   "Sostenuta": 7
+  },
+  "reason": "7 affermazioni su 7 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 7.4,
+  "cents": 0.1414994
+ },
+ {
+  "id": "python-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.57,
+  "confidence": 0.63,
+  "counts": {
+   "Sostenuta": 2,
+   "Non trovata": 5
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «Python è il linguaggio più veloce in assoluto.» [2]\n⚠️ «Python è la scelta migliore per qualunque tipo di software.» [2]\n⚠️ «Python è la scelta migliore per sviluppare sistemi operativi.» [2]\n⚠️ «Python è la scelta migliore per sviluppare videogiochi.» [2]",
+  "seconds": 7.8,
+  "cents": 0.1261718
+ },
+ {
+  "id": "python-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 0.99,
+  "counts": {
+   "Contraddetta": 4
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Python fu creato da Dennis Ritchie ai Bell Labs nel 1972.» [1]\n⚠️ «Il nome Python fu scelto in onore del serpente pitone, simbolo di velocità.» [2]\n⚠️ «Python non usa l'indentazione.» [1][2]\n⚠️ «In Python i blocchi sono delimitati da parentesi graffe.» [1][2]",
+  "seconds": 10.4,
+  "cents": 0.1259218
+ },
+ {
+  "id": "jwst-clean",
+  "expected": 4,
+  "got": 2,
+  "value": 3.7,
+  "confidence": 0.74,
+  "counts": {
+   "Sostenuta": 12,
+   "Non trovata": 5,
+   "Parzialmente sostenuta": 3
+  },
+  "reason": "⚠️ fatto problematico, ma isolato: «Webb ha iniziato le operazioni scientifiche nel luglio 2022.» [2]",
+  "seconds": 22.2,
+  "cents": 0.5573994,
+  "claims": [
+   {
+    "text": "Il telescopio spaziale James Webb è stato lanciato il 25 dicembre 2021.",
+    "kind": "fatto",
+    "refs": [
+     "1",
+     "3"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "1": "Webb studies every phase in the history of our Universe, ranging from the first luminous glows after the Big Bang, to the formation of solar systems capable of supporting life on planets like Earth, to the evolution of our own Solar System. Webb launched on Dec. 25th 2021. It does not orbit around the Earth like the Hubble Space Telescope, it orbits the Sun 1.5 million kilometers (1 million miles) away from the Earth at what is called the second Lagrange point or L2.",
+     "3": ""
+    },
+    "world": 0.97,
+    "number_match": 0.95,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Il telescopio spaziale James Webb è stato lanciato a bordo di un razzo Ariane 5.",
+    "kind": "fatto",
+    "refs": [
+     "1",
+     "3"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 0.97,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "1": "",
+     "3": "The James Webb Space Telescope (Webb) is the next great space science observatory following Hubble, designed to answer outstanding questions about the Universe and to make breakthrough discoveries in all fields of astronomy. Webb will see farther into our origins: from the formation of stars and planets, to the birth of the first galaxies in the early Universe. Webb is an international partnership between NASA, ESA and CSA. The telescope launched on an Ariane 5 from Europe's Spaceport in French Guiana."
+    },
+    "world": 0.97,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Il telescopio spaziale James Webb è stato lanciato dallo spazioporto europeo di Kourou, nella Guyana francese.",
+    "kind": "fatto",
+    "refs": [
+     "1",
+     "3"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 0.92,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "1": "",
+     "3": "The James Webb Space Telescope (Webb) is the next great space science observatory following Hubble, designed to answer outstanding questions about the Universe and to make breakthrough discoveries in all fields of astronomy. Webb will see farther into our origins: from the formation of stars and planets, to the birth of the first galaxies in the early Universe. Webb is an international partnership between NASA, ESA and CSA. The telescope launched on an Ariane 5 from Europe's Spaceport in French Guiana.\nLaunch location: Europe's Spaceport in French Guiana"
+    },
+    "world": 0.96,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Il telescopio spaziale James Webb è un progetto congiunto della NASA, dell'Agenzia Spaziale Europea e dell'Agenzia Spaziale Canadese.",
+    "kind": "fatto",
+    "refs": [
+     "1",
+     "3"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 0.97,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "1": "",
+     "3": "The James Webb Space Telescope (Webb) is the next great space science observatory following Hubble, designed to answer outstanding questions about the Universe and to make breakthrough discoveries in all fields of astronomy. Webb will see farther into our origins: from the formation of stars and planets, to the birth of the first galaxies in the early Universe. Webb is an international partnership between NASA, ESA and CSA. The telescope launched on an Ariane 5 from Europe's Spaceport in French Guiana."
+    },
+    "world": 0.97,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Lo specchio primario di Webb ha un diametro di 6,5 metri.",
+    "kind": "fatto",
+    "refs": [
+     "2",
+     "4"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 0.99,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "2": "Le innovazioni rispetto ai precedenti telescopi spaziali sono il grande specchio primario di 6,5 metri, per studiare lunghezze d'onda nella banda infrarossa, e la presenza di un ampio scudo termico multistrato per il mantenimento di una temperatura operativa molto bassa per bloccare le interferenze da sorgenti di calore non oggetto di studio quali ad esempio il Sole, la Luna, la struttura e la strumentazione stessa del telescopio.",
+     "4": ""
+    },
+    "world": 0.95,
+    "number_match": 0.94,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Lo specchio primario di Webb è composto da 18 segmenti esagonali di berillio ricoperti d'oro.",
+    "kind": "fatto",
+    "refs": [
+     "2",
+     "4"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 0.95,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "2": "Lo specchio primario è costituito da 18 elementi esagonali in berillio affiancati a nido d'ape. Ogni singolo specchio, delle dimensioni di 1,4 metri, è ricoperto da una lamina d'oro spessa 1000 Angstrom (100 nanometri), che riflette meglio la luce infrarossa. La lamina d'oro è a sua volta ricoperta da un sottile strato di SiO2 amorfo (vetro) per proteggerla da graffi in caso di manipolazione o piccole particelle. In fase di lancio lo specchio primario è compattato in 3 sezioni e stivato nel razzo; successivamente è dispiegato con micromotori. La tecnologia ottica del JWST consta di tre specchi anastigmatici in configurazione Korsch.\nPer il JWST sono state sviluppate diverse tecnologie innovative. Le più importanti includono uno specchio primario costituito da 18 specchi esagonali in berillio ultraleggero che dispiegandosi dopo il lancio hanno composto un'unica grande superficie di raccolta. Un'altra caratteristica del JWST è l'ampia schermatura romboidale a cinque strati (separati dal vuoto) in Kapton, un materiale plastico in film che, come un parasole, attenua il calore e garantisce stabilità alle notevoli escursioni termiche a cui gli strumenti sono sottoposti. Lo studio di metrologie estremamente precise nei test acustici e ambientali ha contribuito allo sviluppo di strumenti di precisione (interferometria laser din",
+     "4": ""
+    },
+    "world": 0.97,
+    "number_match": 0.86,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "La superficie di raccolta della luce di Webb è circa sei volte maggiore di quella del telescopio spaziale Hubble.",
+    "kind": "fatto",
+    "refs": [
+     "2",
+     "4"
+    ],
+    "verdict": "Non trovata",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "2": "",
+     "4": ""
+    },
+    "world": 0.8,
+    "jev_verdict": "Non trovata",
+    "verdict_label": "Non trovata"
+   },
+   {
+    "text": "Webb osserva soprattutto nell'infrarosso, a differenza di Hubble.",
+    "kind": "fatto",
+    "refs": [
+     "1",
+     "4"
+    ],
+    "verdict": "Non trovata",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "1": "",
+     "4": ""
+    },
+    "world": 0.89,
+    "jev_verdict": "Non trovata",
+    "verdict_label": "Non trovata"
+   },
+   {
+    "text": "L'osservazione nell'infrarosso permette a Webb di vedere attraverso le nubi di polvere.",
+    "kind": "fatto",
+    "refs": [
+     "1",
+     "4"
+    ],
+    "verdict": "Non trovata",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "1": "",
+     "4": ""
+    },
+    "world": 0.94,
+    "jev_verdict": "Non trovata",
+    "verdict_label": "Non trovata"
+   },
+   {
+    "text": "L'osservazione nell'infrarosso permette a Webb di rilevare la luce delle prime galassie, spostata verso l'infrarosso dall'espansione dell'universo.",
+    "kind": "fatto",
+    "refs": [
+     "1",
+     "4"
+    ],
+    "verdict": "Non trovata",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "1": "",
+     "4": ""
+    },
+    "world": 0.95,
+    "jev_verdict": "Non trovata",
+    "verdict_label": "Non trovata"
+   },
+   {
+    "text": "Webb non orbita attorno alla Terra.",
+    "kind": "fatto",
+    "refs": [
+     "2",
+     "4"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "2": "Diversamente da Hubble, Webb orbita intorno al Sole a 1,5 milioni di km dalla Terra al punto L2 di Lagrange, orbita già utilizzata per le missioni WMAP, Herschel e Planck, che tiene il telescopio allineato con l'orbita terrestre consentendo allo scudo di proteggerlo dalla luce e dal calore di Sole, Terra e Luna e garantendo comunicazioni continue con il centro di controllo e un'ininterrotta raccolta di dati non essendo ostacolato dall'interferenza oscuratrice dell'orbita lunare.\nIl 24 gennaio 2022, il JWST ha completato l'inserimento in orbita intorno al secondo punto di Lagrange (L2). Il punto di equilibrio L2 si trova a 1 500 000 km dalla Terra, in direzione opposta al Sole lungo l'asse Sole-Terra. Nonostante il raggio orbitale maggiore rispetto a quello della Terra, un corpo in orbita intorno a L2 mantiene un periodo orbitale pari a quello terrestre per via della somma dei campi gravitazionali del Sole e della Terra. Il telescopio si è attestato sul punto L2 in un'orbita halo, inclinato rispetto al piano dell'eclittica. Poiché L2 è un punto di equilibrio instabile in cui le accelerazioni gravitazionali esercitate da Sole e Terra costituiscono delle accelerazioni \nIl telescopio spaziale James Webb (in inglese James Webb Space Telescope, JWST, o semplicemente Webb) è un telescopio spaziale per l'astronomia a raggi infrarossi, lanciato il 25 dicembre 2021 dallo spazioporto di Arianespace a Kourou, nella Guiana francese, trasportato in orbita solare da un razzo Ariane 5. Il telescopio è il frutto di una collaborazione internazionale tra l'Agenzia spaziale statunitense (NASA), l'Agenzia spaziale europea (ESA) e l'Agenzia spaziale canadese (CSA).",
+     "4": "Webb studies every phase in the history of our Universe, ranging from the first luminous glows after the Big Bang, to the formation of solar systems capable of supporting life on planets like Earth, to the evolution of our own Solar System. Webb launched on Dec. 25th 2021. It does not orbit around the Earth like the Hubble Space Telescope, it orbits the Sun 1.5 million kilometers (1 million miles) away from the Earth at what is called the second Lagrange point or L2."
+    },
+    "world": 0.97,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Webb opera intorno al punto di Lagrange L2 del sistema Sole-Terra.",
+    "kind": "fatto",
+    "refs": [
+     "2",
+     "4"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 0.99,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "2": "Diversamente da Hubble, Webb orbita intorno al Sole a 1,5 milioni di km dalla Terra al punto L2 di Lagrange, orbita già utilizzata per le missioni WMAP, Herschel e Planck, che tiene il telescopio allineato con l'orbita terrestre consentendo allo scudo di proteggerlo dalla luce e dal calore di Sole, Terra e Luna e garantendo comunicazioni continue con il centro di controllo e un'ininterrotta raccolta di dati non essendo ostacolato dall'interferenza oscuratrice dell'orbita lunare.\nIl 24 gennaio 2022, il JWST ha completato l'inserimento in orbita intorno al secondo punto di Lagrange (L2). Il punto di equilibrio L2 si trova a 1 500 000 km dalla Terra, in direzione opposta al Sole lungo l'asse Sole-Terra. Nonostante il raggio orbitale maggiore rispetto a quello della Terra, un corpo in orbita intorno a L2 mantiene un periodo orbitale pari a quello terrestre per via della somma dei campi gravitazionali del Sole e della Terra. Il telescopio si è attestato sul punto L2 in un'orbita halo, inclinato rispetto al piano dell'eclittica. Poiché L2 è un punto di equilibrio instabile in cui le accelerazioni gravitazionali esercitate da Sole e Terra costituiscono delle accelerazioni \npunto di Lagrange L2 (1,5 milioni di chilometri dalla Terra)",
+     "4": "Webb studies every phase in the history of our Universe, ranging from the first luminous glows after the Big Bang, to the formation of solar systems capable of supporting life on planets like Earth, to the evolution of our own Solar System. Webb launched on Dec. 25th 2021. It does not orbit around the Earth like the Hubble Space Telescope, it orbits the Sun 1.5 million kilometers (1 million miles) away from the Earth at what is called the second Lagrange point or L2."
+    },
+    "world": 0.97,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Webb si trova a circa 1,5 milioni di chilometri dalla Terra.",
+    "kind": "fatto",
+    "refs": [
+     "2",
+     "4"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "2": "Diversamente da Hubble, Webb orbita intorno al Sole a 1,5 milioni di km dalla Terra al punto L2 di Lagrange, orbita già utilizzata per le missioni WMAP, Herschel e Planck, che tiene il telescopio allineato con l'orbita terrestre consentendo allo scudo di proteggerlo dalla luce e dal calore di Sole, Terra e Luna e garantendo comunicazioni continue con il centro di controllo e un'ininterrotta raccolta di dati non essendo ostacolato dall'interferenza oscuratrice dell'orbita lunare.\npunto di Lagrange L2 (1,5 milioni di chilometri dalla Terra)",
+     "4": "Webb studies every phase in the history of our Universe, ranging from the first luminous glows after the Big Bang, to the formation of solar systems capable of supporting life on planets like Earth, to the evolution of our own Solar System. Webb launched on Dec. 25th 2021. It does not orbit around the Earth like the Hubble Space Telescope, it orbits the Sun 1.5 million kilometers (1 million miles) away from the Earth at what is called the second Lagrange point or L2."
+    },
+    "world": 0.95,
+    "number_match": 0.97,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Webb è protetto da uno scudo solare a cinque strati grande quanto un campo da tennis.",
+    "kind": "fatto",
+    "refs": [
+     "2",
+     "4"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 0.96,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "2": "Per il JWST sono state sviluppate diverse tecnologie innovative. Le più importanti includono uno specchio primario costituito da 18 specchi esagonali in berillio ultraleggero che dispiegandosi dopo il lancio hanno composto un'unica grande superficie di raccolta. Un'altra caratteristica del JWST è l'ampia schermatura romboidale a cinque strati (separati dal vuoto) in Kapton, un materiale plastico in film che, come un parasole, attenua il calore e garantisce stabilità alle notevoli escursioni termiche a cui gli strumenti sono sottoposti. Lo studio di metrologie estremamente precise nei test acustici e ambientali ha contribuito allo sviluppo di strumenti di precisione (interferometria laser din\nIl parasole a cinque strati del JWST, grande come un campo da tennis, sviluppato da Northrop Grumman\nDiversamente da Hubble, Webb orbita intorno al Sole a 1,5 milioni di km dalla Terra al punto L2 di Lagrange, orbita già utilizzata per le missioni WMAP, Herschel e Planck, che tiene il telescopio allineato con l'orbita terrestre consentendo allo scudo di proteggerlo dalla luce e dal calore di Sole, Terra e Luna e garantendo comunicazioni continue con il centro di controllo e un'ininterrotta raccolta di dati non essendo ostacolato dall'interferenza oscuratrice dell'orbita lunare.",
+     "4": ""
+    },
+    "world": 0.9,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Lo scudo solare mantiene gli strumenti di Webb sotto i 50 kelvin.",
+    "kind": "fatto",
+    "refs": [
+     "2",
+     "4"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": null,
+    "decided_by": "LLM",
+    "reason": "La fonte afferma che lo scudo termico consente il raffreddamento passivo e una temperatura stabile inferiore a 50 K, e indica che gli strumenti nel vicino infrarosso operano a circa 39 K.",
+    "excerpts": {
+     "2": "Lo scudo termico (sunshield) consentirà al telescopio un raffreddamento passivo e una temperatura stabile inferiore a 50 K (−223 °C). Gli strumenti Near Infrared (NIRCam, NIRSpec, FGS / NIRISS) operano a circa 39 K (−234 °C). La (MIRI) nel medio infrarosso funziona ad una temperatura di 7 K (−266 °C), utilizzando un sistema criogenico ad elio. Il raffreddamento consente anche ai segmenti dello specchio primario di rimanere correttamente allineati quando cambia l'orientamento rispetto al Sole.\nLo schermo solare (Sunshield) separa la parte del telescopio direttamente colpita e riscaldata dalla luce solare (l'intero osservatorio) dai componenti elettronici (ISIM) che, elaborando frequenze dell'infrarosso, devono operare a bassa temperatura. La temperatura di esercizio è mantenuta dal sistema criogenico sotto i 50 K (−223,2 °C; −369,7 °F)\nMIRI opera sotto i 6 Kelvin, temperatura garantita da un refrigeratore meccanico ad elio situato sul lato caldo dello scudo termico. MIRI è stata costruita dal Consorzio MIRI.",
+     "4": ""
+    },
+    "world": 0.78,
+    "number_match": 0.81,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Webb ha iniziato le operazioni scientifiche nel luglio 2022.",
+    "kind": "fatto",
+    "refs": [
+     "2"
+    ],
+    "verdict": "Parzialmente sostenuta",
+    "confidence": null,
+    "decided_by": "LLM",
+    "reason": "La fonte afferma che Webb ha iniziato la missione scientifica dopo sei mesi, ma l’estratto non specifica che ciò sia avvenuto nel luglio 2022.",
+    "excerpts": {
+     "2": "Dopo sei mesi: Webb ha iniziato la sua missione scientifica.\nPoiché il primo ciclo di indagini è stato riservato ai ricercatori direttamente coinvolti nello sviluppo del telescopio e i dati delle ricerche non dovrebbero essere resi pubblici entro i primi tre anni, la comunità astronomica ha sollecitato e ottenuto un programma di ricerche che si sovrapporrà al primo ciclo. Questo programma, chiamato Early Release Science (ERS) ha circa il 10% del tempo disponibile del Webb, circa 460 ore. Il 13 novembre 2017 è stata resa pubblica la selezione finale dei 13 programmi scientifici di questo mini ciclo, eseguiti nei primi cinque mesi di operatività del JWST e la cui fattibilità e ordine temporale di esecuzione hanno in parte risentito dello slittamento del"
+    },
+    "world": 0.64,
+    "number_match": 0.21,
+    "jev_verdict": "Parzialmente sostenuta",
+    "verdict_label": "Parzialmente sostenuta"
+   },
+   {
+    "text": "Dall'inizio delle operazioni scientifiche, Webb ha individuato galassie sorprendentemente luminose e massicce solo poche centinaia di milioni di anni dopo il Big Bang.",
+    "kind": "fatto",
+    "refs": [
+     "2"
+    ],
+    "verdict": "Parzialmente sostenuta",
+    "confidence": null,
+    "decided_by": "LLM",
+    "reason": "La fonte riporta la scoperta di sei galassie massicce formatesi 500–700 milioni di anni dopo il Big Bang, ma non specifica che fossero sorprendentemente luminose né che la scoperta risalisse all’inizio delle operazioni scientifiche.",
+    "excerpts": {
+     "2": "Il 22 febbraio 2023 un gruppo di astronomi annuncia la scoperta di sei massicce galassie che si sono formate da 500 a 700 milioni di anni dopo il Big Bang. Si pensa che le galassie abbiano una massa simile alla Via Lattea, ma siano 30 volte più dense; secondo il gruppo di ricerca questa scoperta mette in discussione le teorie sull'evoluzione delle galassie, senza confutare il modello del Big Bang."
+    },
+    "world": 0.81,
+    "jev_verdict": "Parzialmente sostenuta",
+    "verdict_label": "Parzialmente sostenuta"
+   },
+   {
+    "text": "Webb ha misurato l'atmosfera di pianeti extrasolari.",
+    "kind": "fatto",
+    "refs": [
+     "2"
+    ],
+    "verdict": "Parzialmente sostenuta",
+    "confidence": null,
+    "decided_by": "LLM",
+    "reason": "La fonte dice che Webb studierà le atmosfere degli esopianeti e riferisce che è stata illustrata la composizione di WASP-96 b, ma non afferma esplicitamente che ne abbia misurato l’atmosfera.",
+    "excerpts": {
+     "2": "Mediante la tecnica dei transiti, della velocità radiale e con osservazioni di follow-up supportate da telescopi a terra verranno stimate le masse di esopianeti e studiate le loro atmosfere cercando eventuali biofirme. I coronografi e lo studio spettroscopico consentiranno la visualizzazione diretta in banda infrarosso di esopianeti vicino a stelle luminose, comprese eventuali differenze stagionali, la possibile vegetazione, la rotazione, il clima. La spettroscopia, analizzando la luce riflessa degli esopianeti e separandola in lunghezze d'onda distinte permetterà di identificare i loro componenti chimici per determinarne le componenti atmosferiche. Webb potrà cercare biofirme chimiche, come\nIl 12 luglio 2022 la NASA ha diffuso la prima immagine a colori catturata dal telescopio, chiamata Webb's First Deep Field e presentata dal presidente statunitense Joe Biden. Nello stesso giorno è stata illustrata anche la composizione del pianeta extrasolare WASP-96 b (un esopianeta simile a Giove con una massa inferiore del 50%)."
+    },
+    "world": 0.92,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Parzialmente sostenuta"
+   },
+   {
+    "text": "Webb ha rilevato anidride carbonica nell'atmosfera di WASP-39b.",
+    "kind": "fatto",
+    "refs": [
+     "2"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 0.9,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "2": "Il 24 agosto 2022, gli astronomi hanno annunciato che è stata rilevata anidride carbonica nell'atmosfera dell'esopianeta gigante gassoso WASP-39 b con osservazioni di JWST tramite tecniche di spettroscopia di assorbimento nell'ambito del programma Early Release Science (ERS). È stata la prima volta che è stata rilevata anidride carbonica su un pianeta al di fuori del sistema solare."
+    },
+    "world": 0.93,
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "Grazie a un lancio molto preciso che ha fatto risparmiare carburante, si prevede che la missione Webb duri almeno 20 anni.",
+    "kind": "fatto",
+    "refs": [
+     "1"
+    ],
+    "verdict": "Non trovata",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "1": ""
+    },
+    "world": 0.43,
+    "number_match": 0.16,
+    "jev_verdict": "Non trovata",
+    "verdict_label": "Non trovata"
+   }
+  ]
+ },
+ {
+  "id": "jwst-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 2.24,
+  "confidence": 0.79,
+  "counts": {
+   "Sostenuta": 10,
+   "Non trovata": 7,
+   "Parzialmente sostenuta": 2,
+   "Esagerata": 1
+  },
+  "reason": "⚠️ conclusione non giustificata dalle fonti: «Il rilevamento di anidride carbonica nell'atmosfera di WASP-39b significa che Webb ha trovato un forte indizio che questo pianeta possa ospitare la vita.» [2]",
+  "seconds": 27.1,
+  "cents": 0.5170478000000001
+ },
+ {
+  "id": "jwst-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.93,
+  "confidence": 0.78,
+  "counts": {
+   "Sostenuta": 10,
+   "Non trovata": 6,
+   "Parzialmente sostenuta": 2,
+   "Fonte irraggiungibile": 2
+  },
+  "reason": "più fatti gravemente problematici:\n⚠️ «Le osservazioni di Webb hanno dimostrato in modo definitivo che la teoria del Big Bang è sbagliata.» [5]\n⚠️ «Le osservazioni di Webb dimostrano che l'universo è almeno due volte più vecchio di quanto si pensasse.» [5]",
+  "seconds": 23.3,
+  "cents": 0.43318710000000005
+ }
+]

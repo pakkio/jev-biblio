@@ -54,11 +54,16 @@ def main_eval():
             continue
         expected, got = item["expected_stars"], result["rating_stars"]
         confusion[expected - 1][got - 1] += 1
-        rows.append({
+        row = {
             "id": item["id"], "expected": expected, "got": got, "value": result["rating_value"],
             "confidence": result["rating_confidence"], "counts": result["claim_counts"], "reason": result.get("rating_reason", ""),
             "seconds": round(seconds, 1), "cents": result["metrics"]["total_cents"],
-        })
+        }
+        # Per i mismatch salviamo anche le affermazioni con i loro estratti, verdetti e segnali
+        # (world, number_match): senza questo, un errore non è più verificabile dopo la run.
+        if got != expected:
+            row["claims"] = result["claims"]
+        rows.append(row)
 
     print(f"\n{'articolo':22} {'atteso':>6} {'ottenuto':>8} {'Jev':>6} {'conf':>5} {'tempo':>6} {'costo':>8}  affermazioni")
     for r in sorted(rows, key=lambda r: r["id"]):

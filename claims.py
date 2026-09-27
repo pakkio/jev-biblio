@@ -508,7 +508,7 @@ def fetch_page(url, timeout=30, max_bytes=MAX_SOURCE_BYTES):
             "source_type": source_type}, text or None
 
 
-def fetch_all(urls, deadline=8):
+def fetch_all(urls, deadline=30):
     """Controlla e scarica fino a MAX_LINKS URL in parallelo, entro `deadline` secondi in tutto.
 
     Serve un tetto complessivo perché la risoluzione DNS di un dominio inesistente

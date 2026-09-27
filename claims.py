@@ -446,7 +446,7 @@ def _try_wayback(url, timeout, max_bytes):
         return None
 
 
-def fetch_page(url, timeout=8, max_bytes=MAX_SOURCE_BYTES):
+def fetch_page(url, timeout=30, max_bytes=MAX_SOURCE_BYTES):
     """Scarica HTML, testo o PDF; blocca URL privati e contenuti troppo grandi.
 
     Se il sito blocca la richiesta con una verifica anti-bot (es. sfida Cloudflare), la fonte

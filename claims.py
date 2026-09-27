@@ -57,16 +57,17 @@ NO_SOURCE = "Senza fonte"
 UNREACHABLE = "Fonte irraggiungibile"
 
 def qualify_verdict(verdict, confidence):
-    """Rende "Parzialmente sostenuta" più preciso in base alla confidenza di Jev sul verdetto:
-    quasi sostenuta (>75%), leggermente sostenuta (tra 50% e 75%), vagamente sostenuta (<50%).
-    Gli altri verdetti non cambiano."""
+    """Precisa "Parzialmente sostenuta" in "Quasi sostenuta" quando Jev era abbastanza sicuro
+    del verdetto da non richiedere l'intervento del LLM (vedi ESCALATION_THRESHOLD).
+
+    La confidenza misura quanto il giudice è sicuro DI QUEL verdetto, non quanta parte
+    dell'affermazione è coperta dagli estratti: sono due assi diversi, quindi non si può
+    derivarne una scala fine di gradazione (i casi incerti passano al LLM, la cui confidenza
+    sul nuovo verdetto non è comparabile e viene scartata, non riusata qui: chi decide non
+    deve determinare l'etichetta). Per una vera scala di copertura serve uno Score dedicato."""
     if verdict != "Parzialmente sostenuta" or confidence is None:
         return verdict
-    if confidence > 0.75:
-        return "Quasi sostenuta"
-    if confidence >= 0.5:
-        return "Leggermente sostenuta"
-    return "Vagamente sostenuta"
+    return "Quasi sostenuta"
 
 ESCALATION_THRESHOLD = float(os.getenv("ESCALATION_THRESHOLD", "0.8"))
 ESCALATION_MODEL = os.getenv("ESCALATION_MODEL", "openai/gpt-6-luna-pro")
@@ -750,7 +751,10 @@ def verify_claims(client, claims, refs, pages):
                     escalation["errors"].append(error)
                     continue
                 verdict, reason, reply = outcome
-                row.update(verdict=verdict, reason=reason, decided_by="LLM")
+                # La confidenza era di Jev sul SUO verdetto (quello appena scartato): non descrive
+                # quanto il LLM sia sicuro del nuovo. Va azzerata, non lasciata in giro con un'altra
+                # etichetta appiccicata sopra (vedi qualify_verdict).
+                row.update(verdict=verdict, reason=reason, decided_by="LLM", confidence=None)
                 escalation["calls"] += 1
                 escalation["model"] = reply["model"]
                 escalation["input_tokens"] += reply["input_tokens"]

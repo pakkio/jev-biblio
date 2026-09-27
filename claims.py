@@ -843,7 +843,9 @@ def _ask_jev(client, claim, sources, source_description="citate"):
         "output_tokens": response.usage.output_tokens,
     }
     if check_numbers:
-        result["number_match"] = response.answers["numbers"].choice
+        number_answer = response.answers["numbers"]
+        result["number_match"] = number_answer.choice
+        result["number_confidence"] = number_answer.confidence
     if sources:
         answer = response.answers["verdict"]
         result.update(verdict=answer.choice, confidence=answer.confidence, probabilities=answer.probabilities)
@@ -1110,9 +1112,12 @@ def rate(rows, refs):
     # non ne parla, magari perché parla di un soggetto diverso o più specifico): solo "Diverso" è
     # un'alterazione reale. Fondere i due in un singolo segnale, come faceva la vecchia domanda
     # sì/no, faceva scattare la regola anche quando la fonte semplicemente non trattava quel dato.
+    # Richiede anche una confidenza minima sulla scelta: un "Diverso" dato con poca sicurezza non
+    # deve pesare quanto uno netto, specie con una soglia (world < 0.65) che un'intera giornata
+    # di casi ha mostrato sensibile a valori sul bordo.
     altered_numbers = [r for r in facts
-                        if r.get("number_match") == "Diverso" and world(r) < 0.65
-                        and r["verdict"] not in UNVERIFIED]
+                        if r.get("number_match") == "Diverso" and (r.get("number_confidence") or 0) >= 0.6
+                        and world(r) < 0.65 and r["verdict"] not in UNVERIFIED]
     # Citazione probabilmente inventata: l'unica fonte citata non esiste (DNS, 404, 410 — non
     # semplicemente bloccata da anti-bot, vedi _source_likely_nonexistent) e l'affermazione è
     # anche implausibile secondo Jev. Qui il giudizio a priori non è "ignoranza su un fatto

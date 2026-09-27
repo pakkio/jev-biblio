@@ -67,7 +67,12 @@ def qualify_verdict(verdict, confidence):
     deve determinare l'etichetta). Per una vera scala di copertura serve uno Score dedicato."""
     if verdict != "Parzialmente sostenuta" or confidence is None:
         return verdict
-    return "Quasi sostenuta"
+    # Un caso incerto non passato al LLM (niente chiave OpenRouter, oltre MAX_ESCALATIONS,
+    # o la chiamata è fallita) mantiene la confidenza bassa originale di Jev: non è "quasi
+    # sostenuta", è la stessa incertezza che avrebbe dovuto instradarlo altrove.
+    if confidence >= ESCALATION_THRESHOLD:
+        return "Quasi sostenuta"
+    return verdict
 
 ESCALATION_THRESHOLD = float(os.getenv("ESCALATION_THRESHOLD", "0.8"))
 ESCALATION_MODEL = os.getenv("ESCALATION_MODEL", "openai/gpt-6-luna-pro")
@@ -686,11 +691,29 @@ def _escalate(row):
     return data["verdetto"], str(data.get("motivo", "")), reply
 
 
-def verify_claims(client, claims, refs, pages):
+def _source_likely_nonexistent(status):
+    """DNS inesistente, 404 o 410: la fonte probabilmente non esiste (citazione inventata).
+    403, 429, 401, 503 o una sfida anti-bot: la fonte esiste ma blocca le richieste automatiche,
+    il che non dice nulla sulla veridicità dell'affermazione che cita.
+
+    L'host che non risolve viene segnalato in due punti diversi (il controllo SSRF in
+    _validate_source_url e il fallimento della richiesta in _download_raw), con testi diversi:
+    entrambi contano."""
+    if not status:
+        return False
+    if "risolvibile" in status or status.startswith("DNS"):
+        return True
+    return status.split()[0] in ("404", "410")
+
+
+def verify_claims(client, claims, refs, pages, link_statuses=()):
     """Verifica ogni affermazione. `pages` mappa URL -> testo della fonte (None se irraggiungibile).
+    `link_statuses` è l'esito di fetch_all, usato solo per distinguere una fonte probabilmente
+    inesistente da una fonte reale ma bloccata (vedi _source_likely_nonexistent).
 
     Restituisce (righe, metriche Jev, metriche escalation)."""
     paragraphs = {url: html_to_paragraphs(content) for url, content in pages.items() if content}
+    status_by_url = {s["url"]: s["status"] for s in link_statuses}
 
     def check(claim):
         row = {"text": claim["text"], "kind": claim["kind"], "refs": claim["refs"], "verdict": None,
@@ -718,7 +741,11 @@ def verify_claims(client, claims, refs, pages):
         result.update(input_tokens=result["input_tokens"] + extra_in,
                       output_tokens=result["output_tokens"] + extra_out, jev_calls=calls)
         if not sources:
-            return {**row, **result, "verdict": UNREACHABLE if claim["refs"] else NO_SOURCE}
+            cited_urls = [refs[ref]["url"] for ref in claim["refs"] if ref in refs]
+            source_missing = bool(cited_urls) and all(
+                _source_likely_nonexistent(status_by_url.get(url)) for url in cited_urls)
+            return {**row, **result, "verdict": UNREACHABLE if claim["refs"] else NO_SOURCE,
+                    "source_missing": source_missing}
         return {**row, **result, "decided_by": "Jev", "jev_verdict": result["verdict"], "_sources": sources}
 
     start = time.perf_counter()
@@ -899,9 +926,15 @@ def rate(rows, refs):
     altered_numbers = [r for r in facts
                         if r.get("number_match") is not None and r["number_match"] < 0.35 and world(r) < 0.65
                         and r["verdict"] not in UNVERIFIED]
+    # Citazione probabilmente inventata: l'unica fonte citata non esiste (DNS, 404, 410 — non
+    # semplicemente bloccata da anti-bot, vedi _source_likely_nonexistent) e l'affermazione è
+    # anche implausibile secondo Jev. Qui il giudizio a priori non è "ignoranza su un fatto
+    # recente": è la sola evidenza disponibile quando la fonte indicata non esiste affatto.
+    unreachable_implausible = [r for r in checked
+                                if r["verdict"] == UNREACHABLE and r.get("source_missing") and world(r) < 0.3]
 
     seen, serious = set(), []
-    for group in (contradicted, altered_numbers):
+    for group in (contradicted, altered_numbers, unreachable_implausible):
         for r in group:
             if id(r) not in seen:
                 seen.add(id(r))

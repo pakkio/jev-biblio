@@ -115,7 +115,7 @@ def run_bibliography_verifier(article_text, bibliography_raw, find_authoritative
                                error=extraction_error))
 
         # Verifica di ogni affermazione con Jev; i casi incerti passano a un LLM che ragiona
-        rows, jev_claims, escalation = claims.verify_claims(client, claim_list, refs, pages)
+        rows, jev_claims, escalation = claims.verify_claims(client, claim_list, refs, pages, link_statuses)
         steps.append(_step(f"Jev: verifica affermazioni ({jev_claims['calls']} chiamate)", "jev-latest",
                            jev_claims["seconds"], jev_claims["input_tokens"], jev_claims["output_tokens"],
                            _jev_cents(jev_claims["input_tokens"])))

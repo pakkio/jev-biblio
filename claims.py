@@ -1147,11 +1147,12 @@ def rate(rows, refs):
     # 2 stelle: un singolo fatto problematico isolato, o conclusioni non giustificate
     if serious:
         return 2, f"⚠️ fatto problematico, ma isolato: {cite(serious[0])}"
-    # Anche qui, l'implausibilità di Jev conta solo per le conclusioni non coperte da alcuna
-    # fonte (nessun estratto da controllare): non basta da sola contro un verdetto favorevole.
+    # Anche qui, l'implausibilità di Jev da sola non dovrebbe bocciare una conclusione 
+    # se la fonte semplicemente non la menziona (o manca), proprio come per i fatti,
+    # a meno che la fonte non sia irraggiungibile.
     unjustified = [r for r in conclusions
                    if r["verdict"] in ("Esagerata", "Contraddetta")
-                   or (r["verdict"] in UNVERIFIED and world(r) < 0.5)]
+                   or (r["verdict"] == UNREACHABLE and r.get("source_missing") and world(r) < 0.3)]
     if unjustified:
         label = "conclusione non giustificata dalle fonti" if len(unjustified) == 1 \
             else "conclusioni non giustificate dalle fonti"

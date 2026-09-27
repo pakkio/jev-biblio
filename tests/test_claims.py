@@ -101,6 +101,105 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(discovery.authority_label("https://www.nasa.gov/page"), "agenzia pubblica")
 
 
+class ArticleBibliographySplitTests(unittest.TestCase):
+    def test_heuristic_splits_on_a_heading_followed_by_a_url(self):
+        raw = ("Testo dell'articolo, con più di una frase normale.\n\n"
+               "Riferimenti:\n\n[1] Una fonte https://example.org/a\n[2] Un'altra fonte https://example.org/b")
+
+        article, bibliography = claims._split_article_bibliography_heuristic(raw)
+
+        self.assertTrue(article.startswith("Testo dell'articolo"))
+        self.assertTrue(bibliography.startswith("Riferimenti:"))
+        self.assertIn("example.org/a", bibliography)
+
+    def test_heuristic_leaves_plain_articles_untouched(self):
+        raw = "Solo testo dell'articolo, senza alcun elenco di fonti o titolo di sezione."
+
+        article, bibliography = claims._split_article_bibliography_heuristic(raw)
+
+        self.assertEqual(article, raw)
+        self.assertEqual(bibliography, "")
+
+    def test_jev_split_cuts_at_the_first_confirmed_bibliography_paragraph(self):
+        class Client:
+            def system_one(self, **_kwargs):
+                probabilities = [0.1, 0.1, 0.85, 0.9, 0.9]
+                return SimpleNamespace(
+                    answers={f"p{i}": SimpleNamespace(noul=p) for i, p in enumerate(probabilities)},
+                    usage=SimpleNamespace(input_tokens=50, output_tokens=5),
+                )
+
+        raw = ("Un paragrafo dell'articolo.\n\nUn secondo paragrafo dell'articolo.\n\nRiferimenti:\n\n"
+               "[1] Una fonte https://example.org/a\n\n[2] Un'altra fonte https://example.org/b")
+
+        article, bibliography, metrics = claims.split_article_and_bibliography(Client(), raw)
+
+        self.assertIn("secondo paragrafo", article)
+        self.assertNotIn("secondo paragrafo", bibliography)
+        self.assertIn("example.org/a", bibliography)
+        self.assertEqual(metrics, {"input_tokens": 50, "output_tokens": 5})
+
+    def test_jev_split_returns_no_bibliography_when_nothing_is_flagged(self):
+        class Client:
+            def system_one(self, **_kwargs):
+                return SimpleNamespace(
+                    answers={f"p{i}": SimpleNamespace(noul=0.05) for i in range(3)},
+                    usage=SimpleNamespace(input_tokens=30, output_tokens=4),
+                )
+
+        raw = "Primo paragrafo.\n\nSecondo paragrafo.\n\nTerzo paragrafo, tutto articolo, nessuna fonte."
+
+        article, bibliography, metrics = claims.split_article_and_bibliography(Client(), raw)
+
+        self.assertEqual(article, raw)
+        self.assertEqual(bibliography, "")
+
+    def test_too_few_paragraphs_skips_jev_and_uses_the_heuristic(self):
+        class Client:
+            def system_one(self, **_kwargs):
+                raise AssertionError("Jev non dovrebbe essere chiamato per un unico paragrafo")
+
+        raw = "Un solo paragrafo, senza alcuna bibliografia."
+
+        article, bibliography, metrics = claims.split_article_and_bibliography(Client(), raw)
+
+        self.assertEqual(article, raw)
+        self.assertEqual(bibliography, "")
+        self.assertIsNone(metrics)
+
+
+class SourceAuthorityTests(unittest.TestCase):
+    def test_nonexistent_source_is_flagged_without_calling_jev(self):
+        class Client:
+            def system_one(self, **_kwargs):
+                raise AssertionError("una fonte inesistente non deve arrivare a Jev")
+
+        refs = {"1": {"url": "https://blog-esempio-inesistente.invalid/post", "title": "Blog"}}
+        link_statuses = [{"url": refs["1"]["url"], "status": "DNS / Irraggiungibile"}]
+
+        result, in_tok, out_tok = claims.rate_source_authority(Client(), refs, link_statuses, {})
+
+        self.assertEqual(result["1"]["label"], "Inaffidabile")
+        self.assertEqual(result["1"]["color"], "rosso")
+        self.assertEqual((in_tok, out_tok), (0, 0))
+
+    def test_reachable_source_is_classified_by_jev(self):
+        class Client:
+            def system_one(self, **_kwargs):
+                return SimpleNamespace(
+                    answers={"authority": SimpleNamespace(choice="Autorevole", confidence=0.85)},
+                    usage=SimpleNamespace(input_tokens=40, output_tokens=6),
+                )
+
+        refs = {"1": {"url": "https://www.nasa.gov/result", "title": "NASA"}}
+        link_statuses = [{"url": refs["1"]["url"], "status": "200"}]
+
+        result, in_tok, out_tok = claims.rate_source_authority(Client(), refs, link_statuses, {})
+
+        self.assertEqual(result["1"], {"label": "Autorevole", "color": "verde", "confidence": 0.85})
+        self.assertEqual((in_tok, out_tok), (40, 6))
+
+
 class ExternalVerificationTests(unittest.TestCase):
     def test_external_check_uses_page_text_and_stays_separate(self):
         class Client:

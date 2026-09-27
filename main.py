@@ -80,23 +80,47 @@ def run_bibliography_verifier(article_text, bibliography_raw, find_authoritative
             return json.dumps({"error": "Articolo e bibliografia devono essere testo."})
         if not isinstance(find_authoritative_sources, bool):
             return json.dumps({"error": "find_authoritative_sources deve essere booleano."})
-        if not article_text.strip() or not bibliography_raw.strip():
-            return json.dumps({"error": "Inserisci sia l'articolo sia almeno una fonte bibliografica."})
-        if len(article_text) > MAX_ARTICLE_CHARS:
-            return json.dumps({"error": f"Articolo troppo lungo: massimo {MAX_ARTICLE_CHARS:,} caratteri."})
-        if len(bibliography_raw) > MAX_BIBLIOGRAPHY_CHARS:
-            return json.dumps({"error": f"Bibliografia troppo lunga: massimo {MAX_BIBLIOGRAPHY_CHARS:,} caratteri."})
+        if not article_text.strip():
+            return json.dumps({"error": "Inserisci il testo dell'articolo."})
         api_key = os.getenv('TYPESAFE_API_KEY')
         if not api_key:
             return json.dumps({"error": "TYPESAFE_API_KEY non trovata nell'ambiente o nel file .env."})
         client = TypeSafeClient(api_key=api_key)
         steps = []
 
+        # 0. Se la bibliografia non è stata compilata, prova a separarla dal testo incollato:
+        # una pagina copiata per intero ha spesso l'articolo seguito dal suo elenco di fonti.
+        if not bibliography_raw.strip() and len(article_text) <= MAX_ARTICLE_CHARS:
+            start = time.perf_counter()
+            split_article, split_biblio, split_metrics = claims.split_article_and_bibliography(client, article_text)
+            if split_biblio.strip():
+                article_text, bibliography_raw = split_article, split_biblio
+                in_tok = split_metrics["input_tokens"] if split_metrics else 0
+                out_tok = split_metrics["output_tokens"] if split_metrics else 0
+                steps.append(_step("Separazione articolo/bibliografia", "jev-latest" if split_metrics else "-",
+                                   time.perf_counter() - start, in_tok, out_tok, _jev_cents(in_tok)))
+
+        if not article_text.strip() or not bibliography_raw.strip():
+            return json.dumps({"error": "Inserisci sia l'articolo sia almeno una fonte bibliografica."})
+        if len(article_text) > MAX_ARTICLE_CHARS:
+            return json.dumps({"error": f"Articolo troppo lungo: massimo {MAX_ARTICLE_CHARS:,} caratteri."})
+        if len(bibliography_raw) > MAX_BIBLIOGRAPHY_CHARS:
+            return json.dumps({"error": f"Bibliografia troppo lunga: massimo {MAX_BIBLIOGRAPHY_CHARS:,} caratteri."})
+
         # Controllo dei link e download delle fonti, in parallelo
         start = time.perf_counter()
         refs = claims.parse_references(bibliography_raw)
         link_statuses, pages = claims.fetch_all([r["url"] for r in refs.values()])
         steps.append(_step("Controllo link e download fonti", "-", time.perf_counter() - start))
+
+        # Autorevolezza di ogni fonte citata (verde/giallo/arancione/rosso), a parte dal voto
+        start = time.perf_counter()
+        authority_by_ref, auth_in, auth_out = claims.rate_source_authority(client, refs, link_statuses, pages)
+        steps.append(_step(f"Jev: autorevolezza fonti ({len(authority_by_ref)})", "jev-latest",
+                           time.perf_counter() - start, auth_in, auth_out, _jev_cents(auth_in)))
+        authority_by_url = {refs[number]["url"]: rating for number, rating in authority_by_ref.items()}
+        for link in link_statuses:
+            link.update(authority_by_url.get(link["url"], {"label": None, "color": None, "confidence": None}))
 
         # Estrazione delle affermazioni con un LLM (riserva: una frase = un'affermazione)
         start = time.perf_counter()
@@ -352,6 +376,8 @@ html_code = """
         .rating-3 { color: #16a34a; }
         .rating-4 { color: #2563eb; }
         .rating-5 { color: #d4a017; text-shadow: 0 0 8px rgba(212, 160, 23, 0.45); }
+        /* Autorevolezza delle fonti: verde autorevole, giallo semi-autorevole, arancione opinione, rosso inaffidabile */
+        .bg-orange { background-color: #f97316; }
         .kpi-val .stars { font-size: 1.4rem; letter-spacing: 2px; }
         .kpi-val .stars .bi-star { opacity: 0.35; }
         .kpi-val .meaning { font-size: 1rem; font-weight: 600; }
@@ -392,11 +418,11 @@ html_code = """
             <div class="row">
                 <div class="col-md-6 mb-3">
                     <label class="form-label fw-bold">Testo dell'articolo e affermazioni</label>
-                    <textarea id="article-input" class="form-control" rows="5" placeholder="Incolla qui il testo o le affermazioni dell'articolo...">Il calcolo quantistico promette di rivoluzionare la chimica simulando molecole complesse. Uno studio del 2021 di ricercatori IBM ha dimostrato la supremazia quantistica in questo campo, sostenendo che un processore da 50 qubit ha calcolato le energie dello stato fondamentale delle molecole con una fedeltà del 99,9%.</textarea>
+                    <textarea id="article-input" class="form-control" rows="5" placeholder="Incolla qui il testo dell'articolo. Se incolli una pagina intera con la bibliografia già dentro, lascia vuoto il campo a destra: Jev prova a separarle da solo.">Il calcolo quantistico promette di rivoluzionare la chimica simulando molecole complesse. Uno studio del 2021 di ricercatori IBM ha dimostrato la supremazia quantistica in questo campo, sostenendo che un processore da 50 qubit ha calcolato le energie dello stato fondamentale delle molecole con una fedeltà del 99,9%.</textarea>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label fw-bold">Riferimenti bibliografici</label>
-                    <textarea id="bib-input" class="form-control" rows="5" placeholder="Incolla i riferimenti e le fonti della bibliografia con gli URL...">- Watson, H. Simulare molecole su hardware classico. https://httpbin.org/status/200
+                    <label class="form-label fw-bold">Riferimenti bibliografici <span class="text-muted fw-normal">(facoltativo se già inclusi a sinistra)</span></label>
+                    <textarea id="bib-input" class="form-control" rows="5" placeholder="Incolla qui i riferimenti, oppure lasciali vuoti se sono già nel testo dell'articolo...">- Watson, H. Simulare molecole su hardware classico. https://httpbin.org/status/200
 - Smith, J. Simulazioni quantistiche in chimica (2021). Nature. https://httpbin.org/status/404
 - Miller, A. Affermazioni false sul calcolo quantistico. (2022). https://httpbin.org/status/500</textarea>
                 </div>
@@ -502,6 +528,7 @@ html_code = """
                                             <th>Stato HTTP</th>
                                             <th>Attivo</th>
                                             <th>Contenuto</th>
+                                            <th>Autorevolezza</th>
                                         </tr>
                                     </thead>
                                     <tbody id="links-table-body"></tbody>
@@ -692,11 +719,17 @@ html_code = """
                 const contentLabel = link.content_available
                     ? `LETTO${link.source_type ? ' · ' + link.source_type : ''}`
                     : 'NON DISPONIBILE';
+                const authorityColors = {verde: 'bg-success', giallo: 'bg-warning text-dark',
+                    arancione: 'bg-orange text-dark', rosso: 'bg-danger'};
+                const authorityBadge = link.label
+                    ? `<span class="badge ${authorityColors[link.color] || 'bg-secondary'}">${esc(link.label)}</span>`
+                    : '<span class="text-muted">—</span>';
                 row.innerHTML = `
                     <td><a href="${esc(link.url)}" target="_blank" rel="noopener" class="text-truncate d-inline-block" style="max-width:280px;">${esc(link.url)}</a></td>
                     <td><code>${esc(link.status)}</code></td>
                     <td><span class="badge ${badgeClass}">${link.active ? 'ATTIVO' : 'NON ATTIVO'}</span></td>
                     <td><span class="badge ${contentClass}">${esc(contentLabel)}</span></td>
+                    <td>${authorityBadge}</td>
                 `;
                 tableBody.appendChild(row);
             });
@@ -714,8 +747,8 @@ html_code = """
             const bibText = document.getElementById('bib-input').value;
             const findAuthoritativeSources = document.getElementById('external-sources-input').checked;
 
-            if(!articleText || !bibText) {
-                alert("Inserisci sia il testo dell'articolo sia i riferimenti bibliografici.");
+            if(!articleText) {
+                alert("Inserisci il testo dell'articolo (con la bibliografia inclusa, se non l'hai incollata a parte).");
                 return;
             }
 

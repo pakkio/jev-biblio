@@ -5,13 +5,14 @@
 Dashboard web locale che controlla se un articolo è davvero sostenuto dalle sue fonti:
 
 - **verifica i link** della bibliografia e **scarica il testo delle fonti**;
+- **classifica l'autorevolezza di ogni fonte** con Jev in 4 fasce — 🟢 autorevole, 🟡 semi-autorevole, 🟠 opinione, 🔴 inaffidabile (o inesistente) — indipendentemente dal voto dell'articolo;
 - **estrae le affermazioni** dell'articolo con un LLM, separando fatti, conclusioni dell'autore, opinioni ed esperienze personali;
 - **verifica ogni affermazione sul testo delle fonti con [Jev](https://typesafe.ai)** (TypeSafe *System One*) e ne stima la plausibilità secondo la conoscenza generale;
 - **passa a un LLM che ragiona solo i casi in cui Jev è incerto**;
 - **assegna da 1 a 5 stelle con regole esplicite** sui verdetti, mostrando il motivo, e **scrive una giustificazione in italiano**;
 - **mostra tempi e costi** di ogni passaggio, con il totale in centesimi.
 
-Una verifica completa costa in media **0,1-0,2 ¢** e richiede **10-40 secondi**, a seconda della lunghezza dell'articolo. Sul set di test il voto è corretto in 18 articoli su 18 (vedi [Valutazione](#valutazione)).
+Una verifica completa costa in media **0,1-0,2 ¢** e richiede **10-40 secondi**, a seconda della lunghezza dell'articolo. Ultima esecuzione (settembre 2026): 100% sul set di test, 86% sul set di sviluppo (vedi [Valutazione](#valutazione) per i numeri completi e perché sono scesi rispetto a versioni precedenti).
 
 ## Avvio rapido
 
@@ -25,6 +26,8 @@ uv run main.py --port 9000 --no-browser
 Skepsis ascolta solo su localhost. Per esporla intenzionalmente a una rete bisogna aggiungere `--host … --allow-remote` e metterla dietro un proxy con autenticazione e rate limiting.
 
 Incolla il testo dell'articolo e la bibliografia con gli URL, poi premi **Avvia analisi Jev e controllo link**. Nella bibliografia i riferimenti possono essere numerati (`[1] Titolo https://…`) e citati nel testo con `[1]`. Se l'articolo non usa i numeri, è il LLM ad associare ogni affermazione alle fonti pertinenti.
+
+Se hai copiato una pagina intera (articolo e bibliografia già insieme, come capita incollando una pagina web), puoi lasciare vuoto il campo della bibliografia: Jev prova a separare le due parti da solo (vedi il passaggio 1 in [Come funziona](#come-funziona)). Se non trova un elenco di fonti separato, il testo resta tutto nell'articolo e la dashboard chiede comunque una bibliografia.
 
 ## Chiavi API
 
@@ -42,14 +45,16 @@ Senza `OPENROUTER_API_KEY` la dashboard funziona in modalità ridotta: divide l'
 
 | Passaggio | Chi lo fa | Cosa succede |
 |---|---|---|
-| 1. Link e fonti | Python | Scarica in parallelo fino a 15 URL pubblici, con un tetto complessivo di 8 s; legge HTML, testo e PDF entro limiti di dimensione. Usa `curl_cffi` per replicare l'handshake TLS di Chrome (alcuni siti dietro Cloudflare bloccano il fingerprint TLS di `urllib`/`requests` anche con header credibili); se non è installato, torna a `urllib`. |
-| 2. Estrazione | LLM (`gpt-6-luna`), a blocchi in parallelo se l'articolo supera ~2.200 caratteri | Divide il testo in affermazioni atomiche: **fatto**, **conclusione** dell'autore ("quindi", "dimostra che"), **opinione** o **esperienza** in prima persona. Per ognuna indica le fonti e le parole chiave in italiano e inglese. Temperatura 0, per essere il più possibile ripetibile. |
-| 3. Estratti | Python + Jev | Per ogni affermazione trova fino a 12 paragrafi candidati per fonte, per parole chiave e numeri confrontati per valore ("4.700" corrisponde a "4.7k"). Poi Jev, con una domanda sì/no per paragrafo in un'unica chiamata, sceglie quelli che servono davvero a confermare o smentire. |
-| 4. Verifica | Jev, una chiamata per affermazione, in parallelo | Decide se gli estratti sostengono l'affermazione, con quale confidenza, quanto è plausibile secondo la conoscenza generale e — solo se l'affermazione contiene numeri (date, quantità, misure) — se quei numeri corrispondono a quelli delle fonti. |
-| 5. Casi incerti | LLM che ragiona (`gpt-6-luna-pro`) | Solo se la confidenza di Jev è sotto l'80%: rilegge affermazione ed estratti e decide, con una frase di motivazione. |
-| 6. Voto | regole + Jev | Le stelle si calcolano con le regole qui sotto. Jev dà anche pertinenza, aderenza e un voto globale (`Score`), mostrati come informazione e usati come riserva se l'articolo non contiene fatti verificabili. |
-| 7. Giustificazione | LLM (`gpt-6-luna`) | Scrive 4-6 frasi in italiano senza cambiare i voti. |
-| 8. Riscontro esterno (facoltativo) | Tavily + Python + Jev | Se l'utente seleziona l'opzione, cerca fino a 2 fonti per ciascuno dei primi 5 fatti o conclusioni non coperti. Accetta solo domini con una policy dichiarata (enti pubblici, università e una piccola lista di editori/istituzioni), scarica il testo in sicurezza e mostra un verdetto separato. **Non modifica mai le stelle** della bibliografia originale. |
+| 1. Separazione (solo se manca la bibliografia) | Jev, una chiamata con una domanda sì/no per paragrafo (riserva: euristica sui titoli di sezione) | Se l'utente incolla una pagina intera (articolo e bibliografia insieme) senza compilare il campo bibliografia, Jev classifica ogni paragrafo come "articolo" o "elenco di fonti" e taglia al primo paragrafo di bibliografia confermato da una maggioranza dei successivi. Senza questo, o se Jev non decide nulla, il testo resta tutto nell'articolo. |
+| 2. Link e fonti | Python | Scarica in parallelo fino a 15 URL pubblici, con un tetto complessivo di 8 s; legge HTML, testo e PDF entro limiti di dimensione. Usa `curl_cffi` per replicare l'handshake TLS di Chrome (alcuni siti dietro Cloudflare bloccano il fingerprint TLS di `urllib`/`requests` anche con header credibili); se non è installato, torna a `urllib`. |
+| 3. Autorevolezza delle fonti | Jev, una chiamata per fonte, in parallelo | Classifica ogni fonte in **Autorevole** 🟢, **Semi-autorevole** 🟡, **Opinione** 🟠 o **Inaffidabile** 🔴, in base a titolo, dominio e un estratto della pagina. Le fonti probabilmente inesistenti (DNS, 404, 410) sono già "Inaffidabile" senza bisogno di chiedere a Jev. **Non entra nel voto delle stelle**: è un'informazione separata su quanto vale citare quella fonte, non su quanto l'affermazione è sostenuta. |
+| 4. Estrazione | LLM (`gpt-6-luna`), a blocchi in parallelo se l'articolo supera ~2.200 caratteri | Divide il testo in affermazioni atomiche: **fatto**, **conclusione** dell'autore ("quindi", "dimostra che"), **opinione** o **esperienza** in prima persona. Per ognuna indica le fonti e le parole chiave in italiano e inglese. Temperatura 0, per essere il più possibile ripetibile. |
+| 5. Estratti | Python + Jev | Per ogni affermazione trova fino a 12 paragrafi candidati per fonte, per parole chiave e numeri confrontati per valore ("4.700" corrisponde a "4.7k"). Poi Jev, con una domanda sì/no per paragrafo in un'unica chiamata, sceglie quelli che servono davvero a confermare o smentire. |
+| 6. Verifica | Jev, una chiamata per affermazione, in parallelo | Decide se gli estratti sostengono l'affermazione, con quale confidenza, quanto è plausibile secondo la conoscenza generale e — solo se l'affermazione contiene numeri (date, quantità, misure) — se quei numeri corrispondono a quelli delle fonti. |
+| 7. Casi incerti | LLM che ragiona (`gpt-6-luna-pro`) | Solo se la confidenza di Jev è sotto l'80%: rilegge affermazione ed estratti e decide, con una frase di motivazione. |
+| 8. Voto | regole + Jev | Le stelle si calcolano con le regole qui sotto. Jev dà anche pertinenza, aderenza e un voto globale (`Score`), mostrati come informazione e usati come riserva se l'articolo non contiene fatti verificabili (o se il campione è troppo piccolo, o nessuna affermazione risulta confermata). |
+| 9. Giustificazione | LLM (`gpt-6-luna`) | Scrive 4-6 frasi in italiano senza cambiare i voti. |
+| 10. Riscontro esterno (facoltativo) | Tavily + Python + Jev | Se l'utente seleziona l'opzione, cerca fino a 2 fonti per ciascuno dei primi 5 fatti o conclusioni non coperti. Accetta solo domini con una policy dichiarata (enti pubblici, università e una piccola lista di editori/istituzioni), scarica il testo in sicurezza e mostra un verdetto separato. **Non modifica mai le stelle** della bibliografia originale. |
 
 Opinioni ed esperienze personali non vengono verificate e non abbassano il voto. Le conclusioni dell'autore ("questo dimostra che…") invece vengono verificate: è lì che si nascondono gli articoli fuorvianti.
 
@@ -61,11 +66,15 @@ Quando un'affermazione contiene un numero abbastanza specifico da poter essere a
 
 Le stelle non sono un giudizio complessivo "a sensazione": si calcolano dai verdetti sulle singole affermazioni, in quest'ordine, e la dashboard mostra la regola che ha deciso.
 
-1. **1★ Molto falso**: un fatto di base è contraddetto dalle fonti e implausibile, oppure è chiaramente falso (plausibilità < 15%), oppure un'affermazione implausibile è citata solo da fonti irraggiungibili (citazione inventata).
-2. **2★ Vero ma fuorviante**: i fatti reggono, ma una conclusione dell'autore è esagerata, contraddetta o implausibile, oppure un fatto implausibile distorce la fonte.
+1. **1★ Molto falso**: un fatto è contraddetto dalle fonti **e** implausibile secondo Jev (le due cose insieme bastano da sole), oppure ci sono almeno due fatti gravemente problematici (contraddetti, con numeri alterati, o citati solo da una fonte che probabilmente non esiste — DNS inesistente, 404, 410, non semplicemente bloccata da un sito anti-bot).
+2. **2★ Vero ma fuorviante**: un solo fatto problematico isolato, oppure i fatti reggono ma una conclusione dell'autore è esagerata, contraddetta o implausibile, oppure un fatto implausibile distorce la fonte.
 3. **5★ Ottimo**: almeno 3 affermazioni, tutte pienamente sostenute, e fonti non solo enciclopediche.
 4. **4★ Molto buono**: almeno il 60% delle affermazioni confermato dalle fonti. Un articolo basato solo su Wikipedia arriva al massimo a 4★.
-5. **3★ Buono**: negli altri casi.
+5. **3★ Buono**: negli altri casi, purché almeno una affermazione su tre sia confermata dalle fonti.
+
+Con meno di 3 affermazioni verificabili estratte, o con **zero** affermazioni confermate dalle fonti, le regole non decidono e il voto è affidato al voto globale di Jev (`rating_source: "Jev"` invece di `"regole"`): un campione troppo piccolo, o nessuna prova a favore, non giustificano un "Buono" con le regole sopra.
+
+La sola implausibilità di Jev secondo la conoscenza generale **non basta mai da sola** a far scattare una regola: per fatti recenti, tecnici o di nicchia è spesso solo ignoranza del modello, non falsità. Conta solo insieme a un'evidenza reale (una fonte che la contraddice, un numero diverso in un estratto trovato, o una fonte citata che risulta proprio inesistente).
 
 La separazione tra premesse e conclusioni è ciò che distingue 1★ da 2★: il voto globale di Jev, da solo, dava 1★ a quasi tutti gli articoli fuorvianti.
 
@@ -78,7 +87,7 @@ L'API espone il verdetto canonico in `verdict` (usato dalle regole di voto) e la
 | Verdetto | Significato |
 |---|---|
 | Sostenuta | gli estratti dicono la stessa cosa |
-| Parzialmente sostenuta | il nucleo è confermato, alcuni dettagli non compaiono negli estratti. Mostrata come **Quasi sostenuta** (confidenza di Jev >75%), **Leggermente sostenuta** (50-75%) o **Vagamente sostenuta** (<50%) |
+| Parzialmente sostenuta | il nucleo è confermato, alcuni dettagli non compaiono negli estratti. Mostrata come **Quasi sostenuta** se Jev era abbastanza sicuro da non richiedere l'intervento del LLM (confidenza ≥ soglia di escalation, 80% di default); altrimenti resta **Parzialmente sostenuta** — la confidenza misura quanto il giudice è sicuro del verdetto, non quanta parte dell'affermazione è coperta, quindi non si presta a una scala fine di gradazione |
 | Esagerata | l'affermazione trae conclusioni o certezze che le fonti non danno |
 | Contraddetta | le fonti dicono il contrario |
 | Non trovata | gli estratti non trattano l'argomento |
@@ -103,7 +112,9 @@ Da 3 stelle in su il risultato è considerato positivo (`rating_good: true`).
 `eval/` contiene due set di articoli brevi con fonti reali (Wikipedia italiana e inglese, NASA, ESA). Ogni argomento ha una versione corretta (4★ attese), una fuorviante (2★: fatti veri, conclusioni distorte) e una falsa (1★).
 
 - **Sviluppo** (`dataset.jsonl`, 21 articoli): Apollo 11, Marie Curie, Torre di Pisa, Grande muraglia, fotosintesi, Python, telescopio Webb. Usato per mettere a punto le regole.
-- **Test** (`test_dataset.jsonl`, 18 articoli): Everest, penicillina, Galileo, Titanic, Colosseo, DNA. Scritto dopo aver fissato le regole e usato una sola volta. Metà degli articoli non ha marcatori `[n]`.
+- **Test** (`test_dataset.jsonl`, 18 articoli): Everest, penicillina, Galileo, Titanic, Colosseo, DNA. Scritto dopo aver fissato le regole. Metà degli articoli non ha marcatori `[n]`.
+
+**Il set di test non è più "usato una sola volta".** È servito a scoprire il bug di settembre 2026 (sotto) ed è stato rilanciato più volte per verificarne la correzione: da qui in avanti conta come un secondo set di sviluppo, non come test indipendente. Il prossimo cambiamento alle regole di voto ha bisogno di articoli nuovi, mai usati per tarare nulla.
 
 ```bash
 uv run --no-project python eval/build_dataset.py                   # rigenera i due set
@@ -116,22 +127,25 @@ Ogni esecuzione salva i dettagli in `eval/results/` con un timestamp, quindi un 
 
 Risultati di settembre 2026:
 
-| | Voto globale Jev (v1) | Per affermazione, voto Jev (v2) | Per affermazione + regole (v3) | v3 + estratti Jev, estrazione a blocchi, controllo numeri (v4) |
-|---|---|---|---|---|
-| Stelle esatte, sviluppo | 62% | 71% | 95% | 90-95%* |
-| Stelle esatte, **test** | — | — | 100% | 100% |
-| Tempo medio, sviluppo | 5 s | 16,5 s | 14,4 s | 17,1 s |
-| Tempo medio, **articolo lungo** (~9.000 caratteri) | — | — | 20,8 s (estrazione) | **11,6 s** (estrazione, -44%) |
-| Costo medio, sviluppo | 0,019 ¢ | 0,196 ¢ | 0,202 ¢ | 0,225 ¢ |
+| | Voto globale Jev (v1) | Per affermazione, voto Jev (v2) | Per affermazione + regole (v3) | v3 + estratti Jev, estrazione a blocchi, controllo numeri (v4) | dopo la correzione del 27/9 (v5, sotto) |
+|---|---|---|---|---|---|
+| Stelle esatte, sviluppo | 62% | 71% | 95% | 90-95%* | 86% |
+| Entro una stella, sviluppo | — | — | — | — | 95% |
+| Stelle esatte, **test** | — | — | 100% | 100% | 100% |
+| Tempo medio, sviluppo | 5 s | 16,5 s | 14,4 s | 17,1 s | 12,4 s |
+| Tempo medio, **articolo lungo** (~9.000 caratteri) | — | — | 20,8 s (estrazione) | **11,6 s** (estrazione, -44%) | — |
+| Costo medio, sviluppo | 0,019 ¢ | 0,196 ¢ | 0,202 ¢ | 0,225 ¢ | 0,222 ¢ |
 
 *\*Ho visto oscillare lo stesso articolo tra 3★ e 4★ da un'esecuzione all'altra (Grande muraglia, versione corretta): la selezione degli estratti fatta da Jev non è deterministica, quindi a volte sceglie un paragrafo diverso e il verdetto cambia. Non è una regressione di questa versione — l'ho verificato rilanciando lo stesso articolo tre volte.*
 
+**Il calo dal 100% al 86% sul set di sviluppo (27 settembre 2026) è una regressione misurata, non rumore, e vale la pena spiegarla.** Una correzione per togliere un falso positivo (una fonte vera ma bloccata da un sito, tipo un 401 su un repository gated, faceva scattare "1★ molto falso" solo perché Jev non riconosceva un fatto tecnico recente) ha per un breve periodo reso il verificatore troppo indulgente: un articolo con **zero affermazioni confermate su quattro** (Grande muraglia, versione falsa) veniva votato "3★ Buono" invece di "1★ Molto falso", perché l'unico segnale che lo intercettava (la sola implausibilità di Jev, senza altra prova) era stato tolto insieme al falso positivo. È il compromesso classico tra falsi positivi e falsi negativi: la correzione seguente (stessa giornata) ha richiesto **due segnali indipendenti d'accordo** — un'evidenza reale (fonte che contraddice, o citazione a una fonte che non esiste) più l'implausibilità di Jev — invece di uno solo, e ha anche fermato le regole dal dichiarare un voto "dalle regole" quando il campione è troppo piccolo (meno di 3 affermazioni verificabili) o non c'è alcuna prova a favore (0% confermato): in questi casi il voto è affidato al voto globale di Jev invece che a una regola che non ha materiale per decidere.
+
 **Come leggerli:**
-- **Variabilità:** oltre al caso sopra, gli articoli fuorvianti al confine tra 1★ e 2★ possono cambiare risultato da un'esecuzione all'altra (es. Galileo fuorviante: 2★, 1★, 1★ su tre run). L'estrazione del LLM a volte marca come "fatto" una parte di una conclusione.
-- **Chi ha scritto le etichette:** entrambi i set sono stati scritti ed etichettati da chi ha sviluppato le regole, con tre categorie nette. Il test su articoli mai visti riduce il rischio di aver adattato le regole ai dati, ma non lo elimina.
-- **Margine statistico:** con 18 articoli, un 100% è compatibile con una precisione reale intorno all'85-90%.
+- **Variabilità:** oltre al caso sopra, gli articoli fuorvianti al confine tra 1★ e 2★ possono cambiare risultato da un'esecuzione all'altra (es. Galileo fuorviante: 2★, 1★, 1★ su tre run; il telescopio Webb, versione corretta, ha oscillato tra 4★ e 2★ per lo stesso motivo — un singolo controllo sui numeri vicino alla soglia). L'estrazione del LLM a volte marca come "fatto" una parte di una conclusione.
+- **Chi ha scritto le etichette:** entrambi i set sono stati scritti ed etichettati da chi ha sviluppato le regole, con tre categorie nette. Non sono più test indipendenti (vedi sopra).
+- **Margine statistico:** con 18-21 articoli, queste percentuali hanno un margine di diversi punti in entrambe le direzioni.
 - **Articoli reali:** quelli veri sono più sfumati (errori isolati in articoli buoni, opinioni mescolate ai fatti) e il confine tra 3★, 4★ e 5★ è meno netto di quello tra falso e fuorviante.
-- **Prossimo passo:** raccogliere articoli reali etichettati da persone.
+- **Prossimo passo:** raccogliere articoli reali etichettati da persone, e scrivere articoli di valutazione nuovi (mai usati per tarare le regole) prima del prossimo cambiamento.
 
 ## Variabili d'ambiente
 

@@ -151,6 +151,81 @@ def clean_url(url):
     return url
 
 
+# --- Separazione articolo/bibliografia (pagina incollata per intero) -----------------------------
+
+_BIBLIOGRAPHY_HEADING = re.compile(
+    r"^[ \t]*(?:riferiment[oi]|bibliografia|font[ei]|note|references?|sources?|works? cited)\s*:?\s*$",
+    re.IGNORECASE | re.MULTILINE)
+
+
+def _split_article_bibliography_heuristic(raw_text):
+    """Riserva senza LLM: cerca un titolo di sezione comune (Riferimenti/Bibliografia/Note/
+    References...) su una riga propria, seguito entro poche righe da un URL. Tiene l'ultimo
+    titolo che soddisfa la condizione, di solito la vera bibliografia è in fondo al testo."""
+    best = None
+    for match in _BIBLIOGRAPHY_HEADING.finditer(raw_text):
+        if "http" in raw_text[match.end():match.end() + 300]:
+            best = match
+    if not best:
+        return raw_text, ""
+    return raw_text[:best.start()].rstrip(), raw_text[best.start():].strip()
+
+
+MAX_SPLIT_PARAGRAPHS = 60
+
+
+def _split_article_bibliography_jev(client, paragraphs):
+    """Una chiamata Jev con una domanda sì/no per paragrafo: fa parte dell'elenco delle fonti
+    o del testo dell'articolo? Restituisce l'indice del primo paragrafo di bibliografia (o
+    None) e i token usati.
+
+    La bibliografia comincia al primo paragrafo classificato come tale che contiene anche un
+    URL, ma solo se un'evidente maggioranza dei paragrafi successivi lo conferma: evita di
+    tagliare l'articolo per una singola nota isolata in mezzo al testo."""
+    state = "PARAGRAFI DEL TESTO, IN ORDINE:\n" + "\n".join(
+        f"\nP{i}: {p[:400]}" for i, p in enumerate(paragraphs))
+    questions = {
+        f"p{i}": Noul(instructions="Questo paragrafo fa parte di un elenco di fonti "
+                                   "bibliografiche o riferimenti (citazioni, note, URL), "
+                                   "non del testo narrativo dell'articolo?")
+        for i in range(len(paragraphs))
+    }
+    response = client.system_one(state=state, model="jev-latest", questions=questions)
+    is_biblio = [response.answers[f"p{i}"].noul >= 0.5 for i in range(len(paragraphs))]
+    start = None
+    for i, flagged in enumerate(is_biblio):
+        if flagged and "http" in paragraphs[i]:
+            rest = is_biblio[i:]
+            if sum(rest) / len(rest) >= 0.6:
+                start = i
+                break
+    return start, response.usage.input_tokens, response.usage.output_tokens
+
+
+def split_article_and_bibliography(client, raw_text):
+    """Separa testo dell'articolo e bibliografia quando sono stati incollati insieme (tipico
+    di una pagina copiata per intero): chiede a Jev, un paragrafo alla volta in un'unica
+    chiamata, quali fanno parte dell'elenco delle fonti piuttosto che dell'articolo. Se i
+    paragrafi sono troppi, troppo pochi, o la chiamata fallisce, torna all'euristica sui
+    titoli di sezione comuni (Riferimenti/Bibliografia/Note/References...).
+
+    Restituisce (articolo, bibliografia, metriche): bibliografia è vuota se non ne trova una
+    (il testo resta tutto nell'articolo); metriche è None quando ha deciso l'euristica."""
+    paragraphs = [p for p in re.split(r"\n\s*\n", raw_text) if p.strip()]
+    if 2 <= len(paragraphs) <= MAX_SPLIT_PARAGRAPHS:
+        try:
+            start, in_tok, out_tok = _split_article_bibliography_jev(client, paragraphs)
+            metrics = {"input_tokens": in_tok, "output_tokens": out_tok}
+            if start is None:
+                return raw_text, "", metrics
+            return ("\n\n".join(paragraphs[:start]).rstrip(),
+                    "\n\n".join(paragraphs[start:]).strip(), metrics)
+        except Exception as e:
+            print(f"[AVVISO] Separazione articolo/bibliografia con Jev non riuscita, uso l'euristica: {e}")
+    article, bibliography = _split_article_bibliography_heuristic(raw_text)
+    return article, bibliography, None
+
+
 def parse_references(bibliography):
     """Mappa numero di riferimento -> {url, titolo}. Le righe senza [n] vengono numerate in ordine."""
     refs, order = {}, 0
@@ -163,6 +238,78 @@ def parse_references(bibliography):
         title = line.replace(url.group(0), "").strip(" -*\t")
         refs[number.group(1) if number else str(order)] = {"url": clean_url(url.group(0)), "title": title}
     return refs
+
+
+# --- Autorevolezza delle fonti -------------------------------------------------------------------
+
+SOURCE_AUTHORITY = {
+    "Autorevole": "Fonte primaria o di alta reputazione: ente pubblico, rivista scientifica o "
+                  "peer-reviewed, agenzia di stampa maggiore, documentazione ufficiale di "
+                  "un'azienda o istituzione seria.",
+    "Semi-autorevole": "Fonte generalmente affidabile ma non di prim'ordine: media generalisti, "
+                       "siti specializzati non peer-reviewed, enciclopedie curate collettivamente, "
+                       "blog aziendali ufficiali.",
+    "Opinione": "Fonte che esprime principalmente opinioni personali o di parte: blog personali, "
+               "editoriali, forum, social media.",
+    "Inaffidabile": "Fonte inesistente, satirica, nota per disinformazione, o comunque non "
+                    "verificabile come reale.",
+}
+SOURCE_AUTHORITY_COLOR = {"Autorevole": "verde", "Semi-autorevole": "giallo",
+                          "Opinione": "arancione", "Inaffidabile": "rosso"}
+
+
+def _rate_one_source_authority(client, ref):
+    """Una chiamata Jev per fonte: come per il verdetto delle affermazioni (_ask_jev), una
+    domanda alla volta con tutta l'attenzione su una sola fonte dà risposte più nette di una
+    domanda in mezzo a tante altre nella stessa chiamata (batching più economico, ma con
+    risposte che tendono ad appiattirsi verso il centro)."""
+    state = (f"FONTE DA CLASSIFICARE:\nTitolo: {ref['title'] or '(senza titolo)'}\nURL: {ref['url']}\n"
+             f"Dominio: {urlsplit(ref['url']).hostname or ''}")
+    if ref.get("excerpt"):
+        state += f"\nEstratto della pagina: {ref['excerpt']}"
+    response = client.system_one(state=state, model="jev-latest", questions={
+        "authority": Choice(
+            instructions="Quanto è autorevole questa fonte come riferimento per affermazioni "
+                         "fattuali? Giudica soprattutto in base al dominio e alla reputazione "
+                         "della testata o organizzazione che lo gestisce, non solo al frammento "
+                         "di pagina mostrato.",
+            criteria=SOURCE_AUTHORITY)
+    })
+    answer = response.answers["authority"]
+    return (answer.choice, answer.confidence, response.usage.input_tokens, response.usage.output_tokens)
+
+
+def rate_source_authority(client, refs, link_statuses, pages):
+    """Classifica ogni fonte della bibliografia in una delle 4 fasce di autorevolezza (verde,
+    giallo, arancione, rosso), con Jev: una chiamata per fonte, in parallelo, basata su titolo,
+    dominio e — se disponibile — un estratto del contenuto scaricato.
+
+    Le fonti probabilmente inesistenti (vedi _source_likely_nonexistent: DNS, 404, 410 — non
+    semplicemente bloccate da un sito anti-bot) sono già "Inaffidabile" per certo, senza
+    bisogno di chiedere a Jev.
+
+    Restituisce (fasce per numero di riferimento, token input, token output)."""
+    status_by_url = {s["url"]: s["status"] for s in link_statuses}
+    items = list(refs.items())
+    result, to_ask = {}, []
+    for number, ref in items:
+        if _source_likely_nonexistent(status_by_url.get(ref["url"])):
+            result[number] = {"label": "Inaffidabile", "color": SOURCE_AUTHORITY_COLOR["Inaffidabile"],
+                              "confidence": None}
+        else:
+            paragraphs = html_to_paragraphs(pages[ref["url"]]) if pages.get(ref["url"]) else []
+            to_ask.append((number, {**ref, "excerpt": paragraphs[0][:300] if paragraphs else ""}))
+    if not to_ask:
+        return result, 0, 0
+
+    with ThreadPoolExecutor(max_workers=min(8, len(to_ask))) as pool:
+        answers = list(pool.map(lambda item: _rate_one_source_authority(client, item[1]), to_ask))
+    in_tok = out_tok = 0
+    for (number, ref), (label, confidence, i_tok, o_tok) in zip(to_ask, answers):
+        result[number] = {"label": label, "color": SOURCE_AUTHORITY_COLOR[label], "confidence": confidence}
+        in_tok += i_tok
+        out_tok += o_tok
+    return result, in_tok, out_tok
 
 
 def _pdf_to_text(body):
@@ -940,6 +1087,14 @@ def rate(rows, refs):
                 seen.add(id(r))
                 serious.append(r)
 
+    # Un fatto contraddetto dalla fonte E implausibile secondo Jev è già due segnali
+    # indipendenti d'accordo sullo stesso fatto: basta da solo, non serve un secondo fatto
+    # separato per avere un "pattern" (a differenza di un singolo fatto isolato, sotto).
+    doubly_confirmed_false = [r for r in contradicted if world(r) < 0.15]
+    if doubly_confirmed_false:
+        listed = "\n".join(f"⚠️ {cite(r)}" for r in doubly_confirmed_false)
+        return 1, f"affermazione contraddetta dalla fonte e del tutto implausibile:\n{listed}"
+
     # 1 stella: più fatti gravemente problematici (problema sistemico, non un singolo errore isolato)
     if len(serious) >= 2:
         listed = "\n".join(f"⚠️ {cite(r)}" for r in serious)
@@ -968,15 +1123,25 @@ def rate(rows, refs):
         listed = "\n".join(f"⚠️ {cite(r)}" for r in distorted)
         return 2, f"{label}:\n{listed}"
 
-    # 3-5 stelle: quota di affermazioni confermate dalle fonti
+    # 3-5 stelle: quota di affermazioni confermate dalle fonti. Con troppo poche affermazioni
+    # verificabili il campione è troppo piccolo per dichiarare un buon voto dalle regole (es.
+    # una sola affermazione confermata su una sola trovata non è "ottimo", è "non abbastanza
+    # materiale"): si rimanda al voto complessivo di Jev, come per gli articoli senza fatti.
+    if len(checked) < 3:
+        return None, f"solo {len(checked)} affermazioni verificabili estratte: campione troppo piccolo per un voto dalle regole"
     supported = [r for r in checked if r["verdict"] in SUPPORTED]
     share = len(supported) / len(checked)
     cited = {ref for r in checked for ref in r["refs"]}
     only_encyclopedic = cited and all(any(d in refs.get(ref, {}).get("url", "") for d in ENCYCLOPEDIC) for ref in cited)
     fully = all(r["verdict"] == "Sostenuta" for r in checked)
-    if fully and len(checked) >= 3 and not only_encyclopedic:
+    if fully and not only_encyclopedic:
         return 5, "tutte le affermazioni sono confermate da fonti primarie"
     if share >= 0.6:
         note = " (fonti solo enciclopediche: massimo 4 stelle)" if fully and only_encyclopedic else ""
         return 4, f"{len(supported)} affermazioni su {len(checked)} confermate dalle fonti{note}"
+    # Zero affermazioni confermate non è "buono, ma con lacune": è che le regole non hanno
+    # trovato alcuna prova a favore. Meglio rimandare al voto complessivo di Jev (che vede
+    # anche plausibilità e coerenza generale) che dichiarare "Buono" senza fondamento.
+    if share == 0:
+        return None, "nessuna affermazione confermata dalle fonti: voto affidato alla valutazione globale di Jev"
     return 3, f"solo {len(supported)} affermazioni su {len(checked)} confermate dalle fonti"

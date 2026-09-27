@@ -1,0 +1,306 @@
+[
+ {
+  "id": "apollo11-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.09,
+  "confidence": 0.76,
+  "counts": {
+   "Sostenuta": 4,
+   "Parzialmente sostenuta": 4,
+   "Non trovata": 1
+  },
+  "reason": "8 affermazioni su 9 confermate dalle fonti",
+  "seconds": 19.2,
+  "cents": 0.3746432
+ },
+ {
+  "id": "apollo11-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.42,
+  "confidence": 0.65,
+  "counts": {
+   "Sostenuta": 3,
+   "Non trovata": 5
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «La quarantena degli astronauti dell'Apollo 11 dimostra che la NASA sapeva che sulla Luna esistevano microrganismi pericolosi.» [2]\n⚠️ «La NASA tenne nascosto di sapere che sulla Luna esistevano microrganismi pericolosi.» [2]\n⚠️ «Michael Collins rimase in orbita perché la NASA non lo riteneva abbastanza affidabile per scendere sulla Luna.» [2]",
+  "seconds": 13.9,
+  "cents": 0.18161680000000002
+ },
+ {
+  "id": "apollo11-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 0.99,
+  "counts": {
+   "Non trovata": 2,
+   "Contraddetta": 4,
+   "Esagerata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «La missione Apollo 11 aveva un equipaggio di quattro astronauti.» [1]\n⚠️ «Buzz Aldrin fu il primo uomo a mettere piede sulla Luna.» [1][2]\n⚠️ «Michael Collins mise piede sulla Luna dopo Buzz Aldrin.» [1][2]\n⚠️ «Gli astronauti di Apollo 11 rimasero sulla superficie lunare per due settimane.» [2]",
+  "seconds": 15.9,
+  "cents": 0.229242
+ },
+ {
+  "id": "curie-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.3,
+  "confidence": 0.61,
+  "counts": {
+   "Sostenuta": 7
+  },
+  "reason": "7 affermazioni su 7 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 9.6,
+  "cents": 0.1383704
+ },
+ {
+  "id": "curie-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 2.05,
+  "confidence": 0.9,
+  "counts": {
+   "Sostenuta": 4,
+   "Senza fonte": 1,
+   "Opinione": 1
+  },
+  "reason": "⚠️ conclusione non giustificata dalle fonti: «La morte di Marie Curie dimostra che la ricerca sulla radioattività è intrinsecamente mortale per chiunque la pratichi.»",
+  "seconds": 7.3,
+  "cents": 0.09429760000000001
+ },
+ {
+  "id": "curie-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 0.99,
+  "counts": {
+   "Contraddetta": 4,
+   "Non trovata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Marie Curie nacque a Parigi nel 1880.» [1]\n⚠️ «Marie Curie vinse tre premi Nobel.» [2]\n⚠️ «Tutti e tre i premi Nobel vinti da Marie Curie furono per la fisica.» [2]\n⚠️ «La scoperta più importante di Marie Curie fu l'uranio.» [1][2]",
+  "seconds": 11.4,
+  "cents": 0.1534934
+ },
+ {
+  "id": "pisa-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 3.81,
+  "confidence": 0.71,
+  "counts": {
+   "Sostenuta": 3,
+   "Parzialmente sostenuta": 3,
+   "Non trovata": 2
+  },
+  "reason": "6 affermazioni su 8 confermate dalle fonti",
+  "seconds": 14.6,
+  "cents": 0.3661972
+ },
+ {
+  "id": "pisa-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.63,
+  "confidence": 0.68,
+  "counts": {
+   "Senza fonte": 1,
+   "Sostenuta": 2,
+   "Non trovata": 2
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «La Torre di Pisa ha un problema che è stato risolto per sempre.»\n⚠️ «La Torre di Pisa è ormai perfettamente stabile.» [2]",
+  "seconds": 6.8,
+  "cents": 0.0839472
+ },
+ {
+  "id": "pisa-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 1.0,
+  "counts": {
+   "Non trovata": 1,
+   "Contraddetta": 3,
+   "Esagerata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «La Torre di Pisa fu costruita in soli cinque anni.» [1]\n⚠️ «La Torre di Pisa fu costruita dal 1350 al 1355.» [1]\n⚠️ «Gli architetti vollero l'inclinazione della Torre di Pisa per stupire i visitatori.» [2]",
+  "seconds": 10.1,
+  "cents": 0.13759960000000002
+ },
+ {
+  "id": "muraglia-clean",
+  "expected": 4,
+  "got": 3,
+  "value": 3.41,
+  "confidence": 0.59,
+  "counts": {
+   "Non trovata": 2,
+   "Parzialmente sostenuta": 1,
+   "Sostenuta": 1
+  },
+  "reason": "solo 2 affermazioni su 4 confermate dalle fonti",
+  "seconds": 11.6,
+  "cents": 0.1922036
+ },
+ {
+  "id": "muraglia-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.38,
+  "confidence": 0.68,
+  "counts": {
+   "Sostenuta": 1,
+   "Non trovata": 3
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «È confermato che la Grande Muraglia cinese è la costruzione umana più visibile dallo spazio.» [2]\n⚠️ «La Grande Muraglia cinese è riconoscibile dalla Luna.» [2]",
+  "seconds": 6.9,
+  "cents": 0.07519740000000001
+ },
+ {
+  "id": "muraglia-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 1.0,
+  "counts": {
+   "Non trovata": 2,
+   "Contraddetta": 2
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «La Grande muraglia cinese fu costruita sotto un unico imperatore.» [1]\n⚠️ «La Grande muraglia cinese è lunga esattamente 3.000 chilometri.» [1][2]",
+  "seconds": 12.3,
+  "cents": 0.1692806
+ },
+ {
+  "id": "fotosintesi-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.24,
+  "confidence": 0.58,
+  "counts": {
+   "Sostenuta": 5
+  },
+  "reason": "5 affermazioni su 5 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 7.4,
+  "cents": 0.1250722
+ },
+ {
+  "id": "fotosintesi-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.22,
+  "confidence": 0.82,
+  "counts": {
+   "Opinione": 1,
+   "Sostenuta": 1,
+   "Non trovata": 2,
+   "Esagerata": 1
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «Il fatto che una parte importante dell’ossigeno atmosferico sia prodotta dal fitoplancton marino dimostra che le foreste non hanno alcun ruolo nel ciclo dell’ossigeno.» [2]\n⚠️ «Il fatto che una parte importante dell’ossigeno atmosferico sia prodotta dal fitoplancton marino dimostra che disboscare le foreste non ha conseguenze sull’atmosfera.» [2]",
+  "seconds": 12.7,
+  "cents": 0.1934192
+ },
+ {
+  "id": "fotosintesi-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.0,
+  "confidence": 1.0,
+  "counts": {
+   "Contraddetta": 6
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Durante la fotosintesi le piante assorbono ossigeno.» [1]\n⚠️ «Durante la fotosintesi le piante rilasciano anidride carbonica.» [1]\n⚠️ «La fotosintesi avviene nei mitocondri.» [2]\n⚠️ «La clorofilla si trova nei mitocondri.» [2]\n⚠️ «La fotosintesi può avvenire solo di notte.» [1][2]\n⚠️ «La fotosintesi può avvenire solo quando le piante sono al riparo dal sole.» [1][2]",
+  "seconds": 7.0,
+  "cents": 0.12390520000000001
+ },
+ {
+  "id": "python-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.69,
+  "confidence": 0.75,
+  "counts": {
+   "Sostenuta": 7
+  },
+  "reason": "7 affermazioni su 7 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 7.9,
+  "cents": 0.1354592
+ },
+ {
+  "id": "python-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.45,
+  "confidence": 0.63,
+  "counts": {
+   "Sostenuta": 2,
+   "Non trovata": 4,
+   "Contraddetta": 1
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «Python è il linguaggio più veloce in assoluto.» [2]\n⚠️ «Python è la scelta migliore per qualunque tipo di software.» [2]\n⚠️ «Python è la scelta migliore per realizzare sistemi operativi.» [2]\n⚠️ «Python è la scelta migliore per realizzare videogiochi.» [2]",
+  "seconds": 7.7,
+  "cents": 0.1209758
+ },
+ {
+  "id": "python-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 0.99,
+  "counts": {
+   "Contraddetta": 4
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Python fu creato da Dennis Ritchie ai Bell Labs nel 1972.» [1]\n⚠️ «Il nome Python fu scelto in onore del serpente pitone, simbolo di velocità.» [2]\n⚠️ «Python non usa l'indentazione.» [1][2]\n⚠️ «In Python i blocchi sono delimitati da parentesi graffe.» [1][2]",
+  "seconds": 8.6,
+  "cents": 0.1160424
+ },
+ {
+  "id": "jwst-clean",
+  "expected": 4,
+  "got": 2,
+  "value": 3.79,
+  "confidence": 0.8,
+  "counts": {
+   "Sostenuta": 12,
+   "Non trovata": 5,
+   "Parzialmente sostenuta": 3
+  },
+  "reason": "⚠️ fatto problematico, ma isolato: «Webb ha iniziato le operazioni scientifiche nel luglio 2022.» [2]",
+  "seconds": 23.1,
+  "cents": 0.5350501000000001
+ },
+ {
+  "id": "jwst-misleading",
+  "expected": 2,
+  "got": 1,
+  "value": 2.2,
+  "confidence": 0.82,
+  "counts": {
+   "Sostenuta": 9,
+   "Non trovata": 6,
+   "Esagerata": 2,
+   "Parzialmente sostenuta": 3
+  },
+  "reason": "più fatti gravemente problematici:\n⚠️ «Lo scudo solare di Webb mantiene gli strumenti sotto i 50 kelvin.» [2][4]\n⚠️ «Webb ha iniziato le operazioni scientifiche nel luglio 2022.» [2]",
+  "seconds": 21.2,
+  "cents": 0.608263
+ },
+ {
+  "id": "jwst-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.89,
+  "confidence": 0.77,
+  "counts": {
+   "Sostenuta": 11,
+   "Non trovata": 4,
+   "Parzialmente sostenuta": 3,
+   "Fonte irraggiungibile": 2
+  },
+  "reason": "più fatti gravemente problematici:\n⚠️ «Le operazioni scientifiche di Webb sono iniziate nel luglio 2022.» [2]\n⚠️ «Le osservazioni di Webb hanno dimostrato in modo definitivo che la teoria del Big Bang è sbagliata.» [5]\n⚠️ «Le osservazioni di Webb dimostrano che l'universo è almeno due volte più vecchio di quanto si pensasse.» [5]",
+  "seconds": 24.6,
+  "cents": 0.49960010000000005
+ }
+]

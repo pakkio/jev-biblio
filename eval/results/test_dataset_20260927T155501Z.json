@@ -1,0 +1,253 @@
+[
+ {
+  "id": "everest-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 3.84,
+  "confidence": 0.73,
+  "counts": {
+   "Sostenuta": 5,
+   "Non trovata": 2
+  },
+  "reason": "5 affermazioni su 7 confermate dalle fonti",
+  "seconds": 8.8,
+  "cents": 0.1294402
+ },
+ {
+  "id": "everest-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.53,
+  "confidence": 0.6,
+  "counts": {
+   "Sostenuta": 1,
+   "Non trovata": 1,
+   "Senza fonte": 3
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «Salire sull’Everest è diventato facile.»\n⚠️ «Salire sull’Everest è privo di rischi.»\n⚠️ «Salire sull’Everest è alla portata di chiunque.»",
+  "seconds": 10.8,
+  "cents": 0.1176866
+ },
+ {
+  "id": "everest-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.0,
+  "confidence": 1.0,
+  "counts": {
+   "Contraddetta": 2,
+   "Non trovata": 2
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «L’Everest è alto 9.500 metri.» [1]\n⚠️ «L’Everest si trova nella cordigliera delle Ande.» [1]",
+  "seconds": 6.8,
+  "cents": 0.0741638
+ },
+ {
+  "id": "penicillina-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 3.88,
+  "confidence": 0.68,
+  "counts": {
+   "Sostenuta": 4
+  },
+  "reason": "4 affermazioni su 4 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 13.7,
+  "cents": 0.1896748
+ },
+ {
+  "id": "penicillina-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.33,
+  "confidence": 0.73,
+  "counts": {
+   "Sostenuta": 2,
+   "Esagerata": 2
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «La resistenza di molti batteri alla penicillina significa che gli antibiotici non funzionano più contro nessuna infezione.» [2]\n⚠️ «La resistenza di molti batteri alla penicillina significa che non ha più senso usare gli antibiotici.» [2]",
+  "seconds": 11.0,
+  "cents": 0.1938716
+ },
+ {
+  "id": "penicillina-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.0,
+  "confidence": 1.0,
+  "counts": {
+   "Non trovata": 2,
+   "Contraddetta": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «La penicillina è efficace soprattutto contro l'influenza.» [2]",
+  "seconds": 6.4,
+  "cents": 0.064015
+ },
+ {
+  "id": "galileo-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 3.92,
+  "confidence": 0.62,
+  "counts": {
+   "Sostenuta": 3,
+   "Parzialmente sostenuta": 1
+  },
+  "reason": "4 affermazioni su 4 confermate dalle fonti",
+  "seconds": 12.1,
+  "cents": 0.2149334
+ },
+ {
+  "id": "galileo-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.67,
+  "confidence": 0.71,
+  "counts": {
+   "Sostenuta": 1,
+   "Esagerata": 2
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «La scoperta dei quattro satelliti di Giove dimostrò definitivamente che la Terra gira intorno al Sole.» [1][2]\n⚠️ «Dopo la scoperta dei satelliti di Giove, nessuno scienziato ebbe più dubbi sul fatto che la Terra gira intorno al Sole.» [1][2]",
+  "seconds": 6.3,
+  "cents": 0.105119
+ },
+ {
+  "id": "galileo-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.0,
+  "confidence": 1.0,
+  "counts": {
+   "Contraddetta": 2,
+   "Non trovata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Galileo Galilei scoprì i due satelliti di Marte nel 1650.» [1]\n⚠️ «Galileo Galilei dedicò i due satelliti di Marte alla famiglia Sforza di Milano.» [2]",
+  "seconds": 9.5,
+  "cents": 0.1085882
+ },
+ {
+  "id": "titanic-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.25,
+  "confidence": 0.66,
+  "counts": {
+   "Sostenuta": 5
+  },
+  "reason": "5 affermazioni su 5 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 9.1,
+  "cents": 0.1900862
+ },
+ {
+  "id": "titanic-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.49,
+  "confidence": 0.59,
+  "counts": {
+   "Sostenuta": 3,
+   "Non trovata": 2
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «L’affondamento del Titanic dimostra che la tecnologia moderna rende le navi sempre più pericolose.» [1][2]\n⚠️ «Le navi di oggi sono meno sicure delle navi a vela del passato.» [1][2]",
+  "seconds": 7.0,
+  "cents": 0.1283434
+ },
+ {
+  "id": "titanic-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.0,
+  "confidence": 1.0,
+  "counts": {
+   "Contraddetta": 3,
+   "Non trovata": 2
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Il Titanic affondò nel 1915.» [1][2]\n⚠️ «Grazie alle scialuppe, tutti i passeggeri del Titanic si salvarono.» [1][2]\n⚠️ «Grazie alle scialuppe, tutto l'equipaggio del Titanic si salvò.» [1][2]",
+  "seconds": 7.0,
+  "cents": 0.11151940000000002
+ },
+ {
+  "id": "colosseo-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.35,
+  "confidence": 0.62,
+  "counts": {
+   "Sostenuta": 7
+  },
+  "reason": "7 affermazioni su 7 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 8.4,
+  "cents": 0.20441040000000002
+ },
+ {
+  "id": "colosseo-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.5,
+  "confidence": 0.58,
+  "counts": {
+   "Sostenuta": 2,
+   "Non trovata": 1,
+   "Esagerata": 1
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «I Romani passavano la maggior parte delle loro giornate a guardare combattimenti.» [1][2]\n⚠️ «L'intera economia di Roma si reggeva sugli spettacoli.» [1][2]",
+  "seconds": 6.7,
+  "cents": 0.1124014
+ },
+ {
+  "id": "colosseo-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 0.99,
+  "counts": {
+   "Non trovata": 3,
+   "Contraddetta": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Il Colosseo poteva contenere al massimo mille persone.» [1][2]",
+  "seconds": 8.0,
+  "cents": 0.1423046
+ },
+ {
+  "id": "dna-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.29,
+  "confidence": 0.53,
+  "counts": {
+   "Sostenuta": 6
+  },
+  "reason": "6 affermazioni su 6 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 7.5,
+  "cents": 0.1857476
+ },
+ {
+  "id": "dna-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.21,
+  "confidence": 0.83,
+  "counts": {
+   "Opinione": 1,
+   "Sostenuta": 2,
+   "Esagerata": 3,
+   "Contraddetta": 1
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «Il carattere di ogni persona è interamente deciso dai geni.» [1][2]\n⚠️ «Il comportamento di ogni persona è interamente deciso dai geni.» [1][2]\n⚠️ «Il carattere di ogni persona non può essere cambiato in alcun modo.» [1][2]\n⚠️ «Il comportamento di ogni persona non può essere cambiato in alcun modo.» [1][2]",
+  "seconds": 12.8,
+  "cents": 0.3110572
+ },
+ {
+  "id": "dna-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.0,
+  "confidence": 1.0,
+  "counts": {
+   "Contraddetta": 2
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «La struttura del DNA fu scoperta da Charles Darwin nel 1859.» [1][2]\n⚠️ «Il DNA è formato da tre sole basi azotate: adenina, guanina e uracile.» [1][2]",
+  "seconds": 6.2,
+  "cents": 0.0770824
+ }
+]

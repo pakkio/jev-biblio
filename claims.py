@@ -620,7 +620,9 @@ def _select_with_jev(client, claim, candidates):
 
 
 WORLD_QUESTION = ("Indipendentemente dagli estratti, l'affermazione è vera secondo le conoscenze storiche "
-                  "e scientifiche consolidate?")
+                  "e scientifiche consolidate? Se descrive un evento recente, tecnico o di nicchia che potresti "
+                  "semplicemente non conoscere, non è automaticamente implausibile: rispondi 'implausibile' solo "
+                  "se contraddice fatti consolidati o è internamente inverosimile, non solo perché non la riconosci.")
 NUMBER_QUESTION = ("L'affermazione contiene numeri (date, quantità, misure). Gli estratti contengono "
                    "almeno uno di quei numeri, esattamente com'è nell'affermazione o con un arrotondamento "
                    "normale (es. 8.849 e circa 8.850 contano uguali)? Rispondi no se gli estratti riportano "
@@ -870,9 +872,6 @@ def rate(rows, refs):
     def world(row):
         return row.get("world", 0.5)
 
-    def only_unreachable(row):
-        return row["verdict"] == UNREACHABLE
-
     def cite(row):
         """Affermazione tra virgolette, con i numeri delle fonti citate in bibliografia."""
         cited = "".join(f"[{n}]" for n in row["refs"])
@@ -881,12 +880,13 @@ def rate(rows, refs):
     facts = [r for r in checked if r["kind"] == "fatto"]
     conclusions = [r for r in checked if r["kind"] == "conclusione"]
 
-    # Fatti gravemente problematici: implausibili secondo Jev, contraddetti dalle fonti,
-    # con numeri alterati, o citati solo da fonti irraggiungibili e implausibili.
-    # Una singola bandierina rossa può essere un errore isolato di giudizio (il modello non
-    # conosce un evento recente, un estratto è ambiguo): serve un pattern per bocciare tutto
-    # l'articolo a 1 stella; un singolo caso scende comunque a 2.
-    very_implausible = [r for r in facts if world(r) < 0.15]
+    # Fatti gravemente problematici: contraddetti da un vero estratto della fonte, o con numeri
+    # alterati rispetto a un estratto trovato. La sola implausibilità secondo Jev ("world"), senza
+    # un estratto da confrontare, NON basta: è solo il suo giudizio a priori, e per fatti recenti,
+    # tecnici o di nicchia quel giudizio è spesso semplicemente ignoranza, non falsità. Bocciare un
+    # fatto verificabile per "non lo riconosco" penalizzerebbe proprio le notizie più aggiornate.
+    # world() resta un secondo controllo: richiede che il verdetto (basato su un estratto reale)
+    # sia corroborato dal giudizio generale, non che quel giudizio da solo crei una bandierina.
     contradicted = [r for r in facts if r["verdict"] == "Contraddetta" and world(r) < 0.5]
     # Il segnale "numeri" risponde "no" sia quando la fonte riporta un numero diverso sia
     # quando semplicemente non tratta quel dato: contarlo qui richiede che il verdetto indichi
@@ -895,10 +895,9 @@ def rate(rows, refs):
     altered_numbers = [r for r in facts
                         if r.get("number_match") is not None and r["number_match"] < 0.35 and world(r) < 0.65
                         and r["verdict"] not in UNVERIFIED]
-    unreachable_implausible = [r for r in checked if only_unreachable(r) and world(r) < 0.3]
 
     seen, serious = set(), []
-    for group in (very_implausible, contradicted, altered_numbers, unreachable_implausible):
+    for group in (contradicted, altered_numbers):
         for r in group:
             if id(r) not in seen:
                 seen.add(id(r))
@@ -911,9 +910,11 @@ def rate(rows, refs):
     # 2 stelle: un singolo fatto problematico isolato, o conclusioni non giustificate
     if serious:
         return 2, f"⚠️ fatto problematico, ma isolato: {cite(serious[0])}"
+    # Anche qui, l'implausibilità di Jev conta solo per le conclusioni non coperte da alcuna
+    # fonte (nessun estratto da controllare): non basta da sola contro un verdetto favorevole.
     unjustified = [r for r in conclusions
                    if r["verdict"] in ("Esagerata", "Contraddetta")
-                   or (r["verdict"] in UNVERIFIED and world(r) < 0.5) or world(r) < 0.15]
+                   or (r["verdict"] in UNVERIFIED and world(r) < 0.5)]
     if unjustified:
         label = "conclusione non giustificata dalle fonti" if len(unjustified) == 1 \
             else "conclusioni non giustificate dalle fonti"

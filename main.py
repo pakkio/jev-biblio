@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["typesafe-sdk", "python-dotenv", "pypdf"]
+# dependencies = ["typesafe-sdk", "python-dotenv", "pypdf", "curl-cffi"]
 # ///
 """
 📊 Skepsis — verifica di fonti e affermazioni (versione locale).
@@ -357,6 +357,8 @@ html_code = """
         .kpi-val .meaning { font-size: 1rem; font-weight: 600; }
         .rating-legend { font-size: 0.72rem; line-height: 1.6; }
         .rating-legend span { white-space: nowrap; margin-right: 6px; }
+        .rating-reason { font-size: 0.72rem; font-weight: 400; white-space: pre-line; margin-top: 2px; }
+        .rating-1 .rating-reason, .rating-2 .rating-reason { color: #dc2626; font-weight: 600; }
         .metrics-table td, .metrics-table th { font-size: 0.85rem; }
         .metrics-table .total-row td { font-weight: 700; border-top: 2px solid #e5e7eb; }
         .claims-table td { font-size: 0.88rem; vertical-align: top; }
@@ -581,7 +583,7 @@ html_code = """
                     `<div class="text-muted" style="font-size:0.75rem;"><i class="bi bi-123"></i> numero confermato dalla fonte: ${Math.round(c.number_match * 100)}%</div>`;
                 tr.innerHTML = `<td>${i + 1}</td><td>${kind}${esc(c.text)}${reason}${world}${numbers}${details}</td>`
                     + `<td>${(c.refs || []).map(r => '[' + esc(r) + ']').join('')}</td>`
-                    + `<td><span class="badge verdict-${esc(c.verdict).replace(/ /g, '-')}">${esc(c.verdict)}</span></td>`
+                    + `<td><span class="badge verdict-${esc(c.verdict).replace(/ /g, '-')}">${esc(c.verdict_label || c.verdict)}</span></td>`
                     + `<td class="text-end">${conf}</td><td>${by}</td>`;
                 body.appendChild(tr);
             });
@@ -639,7 +641,7 @@ html_code = """
             el.classList.add(`rating-${stars}`);
             el.innerHTML = `<div class="stars">${starsHtml}</div>`
                 + `<div class="meaning"><i class="bi ${level.icon}"></i> ${level.label}</div>`
-                + (reason ? `<div class="text-muted" style="font-size:0.72rem; font-weight:400;">${esc(reason)}</div>` : '');
+                + (reason ? `<div class="rating-reason">${esc(reason)}</div>` : '');
         }
 
         function renderExternalSources(external) {
@@ -656,7 +658,7 @@ html_code = """
             (external.sources || []).forEach(source => {
                 const check = checksByClaim.get(source.claim_index);
                 const row = document.createElement('tr');
-                const verdict = check ? `${check.verdict}${check.confidence != null ? ' · ' + Math.round(check.confidence * 100) + '%' : ''}` : 'Non verificata';
+                const verdict = check ? `${check.verdict_label || check.verdict}${check.confidence != null ? ' · ' + Math.round(check.confidence * 100) + '%' : ''}` : 'Non verificata';
                 row.innerHTML = `
                     <td>#${source.claim_index + 1}</td>
                     <td><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a><br><small class="text-muted">${esc(source.status || '')}</small></td>

@@ -19,11 +19,28 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from html.parser import HTMLParser
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 
 from typesafe_sdk import Choice, Noul
 
 import llm
+
+# curl_cffi replica l'handshake TLS/JA3 di un browser reale: alcuni siti dietro Cloudflare
+# bloccano urllib/requests a livello di fingerprint TLS ancora prima di leggere gli header,
+# quindi nessuno User-Agent falsificato basta a superarli. Se il modulo non è installato,
+# si torna a urllib (con lo stesso rischio di blocco su quei siti).
+try:
+    from curl_cffi import requests as _curl_requests
+    from curl_cffi.requests.exceptions import RequestException as _CurlRequestException
+
+    HAS_IMPERSONATION = True
+except ImportError:
+    _curl_requests = None
+    _CurlRequestException = ()
+    HAS_IMPERSONATION = False
+
+IMPERSONATE_PROFILE = "chrome"
+MAX_REDIRECTS = 5
 
 # Verdetti possibili per un fatto verificato con le fonti
 VERDICTS = {
@@ -38,6 +55,18 @@ OPINION = "Opinione"
 EXPERIENCE = "Esperienza personale"
 NO_SOURCE = "Senza fonte"
 UNREACHABLE = "Fonte irraggiungibile"
+
+def qualify_verdict(verdict, confidence):
+    """Rende "Parzialmente sostenuta" più preciso in base alla confidenza di Jev sul verdetto:
+    quasi sostenuta (>75%), leggermente sostenuta (tra 50% e 75%), vagamente sostenuta (<50%).
+    Gli altri verdetti non cambiano."""
+    if verdict != "Parzialmente sostenuta" or confidence is None:
+        return verdict
+    if confidence > 0.75:
+        return "Quasi sostenuta"
+    if confidence >= 0.5:
+        return "Leggermente sostenuta"
+    return "Vagamente sostenuta"
 
 ESCALATION_THRESHOLD = float(os.getenv("ESCALATION_THRESHOLD", "0.8"))
 ESCALATION_MODEL = os.getenv("ESCALATION_MODEL", "openai/gpt-6-luna-pro")
@@ -141,19 +170,81 @@ def _pdf_to_text(body):
     return text[:MAX_SOURCE_CHARS]
 
 
-def _download_raw(url, timeout, max_bytes):
-    """Esegue la richiesta HTTP e restituisce (status, content_type, body, charset)."""
+def _download_raw_impersonated(url, timeout, max_bytes):
+    """Scarica replicando l'handshake TLS/JA3 di Chrome (curl_cffi).
+
+    A differenza di urllib, non solleva eccezioni sui codici di stato HTTP: restituisce
+    sempre (status, content_type, body, charset, headers), anche per 403/404/503, così
+    che fetch_page decida come trattarli (incluso il tentativo su Wayback Machine)."""
+    session = _curl_requests.Session(impersonate=IMPERSONATE_PROFILE)
+    try:
+        current_url = url
+        for _ in range(MAX_REDIRECTS):
+            response = session.get(current_url, timeout=timeout, allow_redirects=False, stream=True,
+                                    headers={"Accept-Language": "it,en;q=0.8"})
+            if response.status_code in (301, 302, 303, 307, 308):
+                location = response.headers.get("location")
+                response.close()
+                if not location:
+                    raise URLError("redirect senza Location")
+                current_url = urljoin(current_url, location)
+                _validate_source_url(current_url)
+                continue
+            body = bytearray()
+            try:
+                for chunk in response.iter_content(chunk_size=65536):
+                    body.extend(chunk)
+                    if len(body) > max_bytes:
+                        break
+            finally:
+                status = str(response.status_code)
+                content_type = response.headers.get("content-type", "")
+                charset = response.charset or "utf-8"
+                headers = dict(response.headers)
+                response.close()
+            return status, content_type, bytes(body), charset, headers
+        raise URLError("troppo redirect")
+    finally:
+        session.close()
+
+
+def _download_raw_urllib(url, timeout, max_bytes):
+    """Riserva senza impersonazione TLS, usata solo se curl_cffi non è installato."""
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Skepsis/1.0",
         "Accept-Language": "it,en;q=0.8",
     })
     opener = urllib.request.build_opener(_SafeRedirectHandler())
-    with opener.open(req, timeout=timeout) as response:
-        status = str(response.getcode())
-        content_type = response.headers.get("Content-Type", "")
-        body = response.read(max_bytes + 1)
-        charset = response.headers.get_content_charset() or "utf-8"
-    return status, content_type, body, charset
+    try:
+        with opener.open(req, timeout=timeout) as response:
+            status = str(response.getcode())
+            content_type = response.headers.get("Content-Type", "")
+            body = response.read(max_bytes + 1)
+            charset = response.headers.get_content_charset() or "utf-8"
+            headers = dict(response.headers)
+    except HTTPError as e:
+        status = str(e.code)
+        content_type = e.headers.get("Content-Type", "") if e.headers else ""
+        body = e.read(max_bytes + 1)
+        charset = "utf-8"
+        headers = dict(e.headers) if e.headers else {}
+    return status, content_type, body, charset, headers
+
+
+def _download_raw(url, timeout, max_bytes):
+    """Esegue la richiesta HTTP e restituisce (status, content_type, body, charset, headers).
+
+    Usa curl_cffi con impersonazione TLS di Chrome quando disponibile: alcuni siti dietro
+    Cloudflare bloccano il fingerprint TLS di urllib/requests ancora prima di leggere gli
+    header, quindi nessuno User-Agent falsificato basta a superarli."""
+    if HAS_IMPERSONATION:
+        try:
+            return _download_raw_impersonated(url, timeout, max_bytes)
+        except UnsafeSourceURL:
+            raise
+        except _CurlRequestException as exc:
+            raise URLError(str(exc)) from exc
+    return _download_raw_urllib(url, timeout, max_bytes)
 
 
 def _decode_body(body, content_type, charset, max_bytes):
@@ -200,17 +291,26 @@ def fetch_page(url, timeout=8, max_bytes=MAX_SOURCE_BYTES):
         return {"url": url, "status": f"URL non consentito: {exc}", "active": False,
                 "content_available": False}, None
     try:
-        status, content_type, body, charset = _download_raw(url, timeout, max_bytes)
-    except HTTPError as e:
-        status = str(e.code)
-        server = (e.headers.get("Server") or "").lower()
-        blocked_by_bot_check = e.code in (403, 503) and ("cloudflare" in server or e.headers.get("cf-mitigated"))
+        status, content_type, body, charset, headers = _download_raw(url, timeout, max_bytes)
+    except URLError:
+        return {"url": url, "status": "DNS / Irraggiungibile", "active": False, "content_available": False}, None
+    except UnsafeSourceURL as exc:
+        return {"url": url, "status": f"Redirect non consentito: {exc}", "active": False,
+                "content_available": False}, None
+    except Exception:
+        return {"url": url, "status": "Errore", "active": False, "content_available": False}, None
+
+    code = int(status)
+    if code >= 400:
+        server = (headers.get("Server") or headers.get("server") or "").lower()
+        blocked_by_bot_check = code in (403, 503) and (
+            "cloudflare" in server or headers.get("cf-mitigated") or headers.get("Cf-Mitigated"))
         if blocked_by_bot_check:
             snapshot_url = _wayback_snapshot_url(url)
             if snapshot_url:
                 try:
                     _validate_source_url(snapshot_url)
-                    _, snap_type, snap_body, snap_charset = _download_raw(snapshot_url, timeout, max_bytes)
+                    _, snap_type, snap_body, snap_charset, _ = _download_raw(snapshot_url, timeout, max_bytes)
                     text, source_type = _decode_body(snap_body, snap_type, snap_charset, max_bytes)
                     if text:
                         return {"url": url,
@@ -221,13 +321,6 @@ def fetch_page(url, timeout=8, max_bytes=MAX_SOURCE_BYTES):
                     pass
             status += " (bloccata da verifica anti-bot: la pagina può essere raggiungibile da un browser umano)"
         return {"url": url, "status": status, "active": False, "content_available": False}, None
-    except URLError:
-        return {"url": url, "status": "DNS / Irraggiungibile", "active": False, "content_available": False}, None
-    except UnsafeSourceURL as exc:
-        return {"url": url, "status": f"Redirect non consentito: {exc}", "active": False,
-                "content_available": False}, None
-    except Exception:
-        return {"url": url, "status": "Errore", "active": False, "content_available": False}, None
 
     try:
         text, source_type = _decode_body(body, content_type, charset, max_bytes)
@@ -666,6 +759,7 @@ def verify_claims(client, claims, refs, pages):
     for row in rows:
         for key in ("_sources", "probabilities", "input_tokens", "output_tokens", "jev_calls"):
             row.pop(key, None)
+        row["verdict_label"] = qualify_verdict(row["verdict"], row.get("confidence"))
     return rows, jev, escalation
 
 
@@ -696,10 +790,12 @@ def verify_external_sources(client, claims, discovered_sources, pages):
                 "content_origin": "pagina" if pages.get(source["url"]) else "snippet di ricerca",
             })
         result = _ask_jev(client, claim, excerpts, source_description="esterne selezionate da Skepsis")
+        verdict = result.get("verdict", "Non trovata")
         return {
             "claim_index": index,
             "claim": claim["text"],
-            "verdict": result.get("verdict", "Non trovata"),
+            "verdict": verdict,
+            "verdict_label": qualify_verdict(verdict, result.get("confidence")),
             "confidence": result.get("confidence"),
             "world": result.get("world"),
             "number_match": result.get("number_match"),
@@ -743,7 +839,8 @@ def summarize(rows):
         if row["kind"] == "conclusione":
             by += ", conclusione dell'autore"
         refs = "".join(f"[{r}]" for r in row["refs"])
-        lines.append(f"{i}. [{row['verdict']}{conf}{by}] {row['text']} {refs}".rstrip())
+        label = row.get("verdict_label", row["verdict"])
+        lines.append(f"{i}. [{label}{conf}{by}] {row['text']} {refs}".rstrip())
     return "\n".join(lines) or "(nessuna affermazione estratta)"
 
 
@@ -776,6 +873,11 @@ def rate(rows, refs):
     def only_unreachable(row):
         return row["verdict"] == UNREACHABLE
 
+    def cite(row):
+        """Affermazione tra virgolette, con i numeri delle fonti citate in bibliografia."""
+        cited = "".join(f"[{n}]" for n in row["refs"])
+        return f"«{row['text']}» {cited}".rstrip() if cited else f"«{row['text']}»"
+
     facts = [r for r in checked if r["kind"] == "fatto"]
     conclusions = [r for r in checked if r["kind"] == "conclusione"]
 
@@ -804,17 +906,29 @@ def rate(rows, refs):
 
     # 1 stella: più fatti gravemente problematici (problema sistemico, non un singolo errore isolato)
     if len(serious) >= 2:
-        return 1, f"più fatti gravemente problematici, tra cui: «{serious[0]['text']}»"
+        listed = "\n".join(f"⚠️ {cite(r)}" for r in serious)
+        return 1, f"più fatti gravemente problematici:\n{listed}"
     # 2 stelle: un singolo fatto problematico isolato, o conclusioni non giustificate
     if serious:
-        return 2, f"fatto problematico, ma isolato: «{serious[0]['text']}»"
-    for r in conclusions:
-        if r["verdict"] in ("Esagerata", "Contraddetta") or (r["verdict"] in UNVERIFIED and world(r) < 0.5) or world(r) < 0.15:
-            return 2, f"conclusione non giustificata dalle fonti: «{r['text']}»"
-    for r in facts:
-        # un fatto che Jev ritiene vero non è una distorsione, anche se l'estratto lo copre solo in parte
-        if r["verdict"] == "Esagerata" and world(r) < 0.5:
-            return 2, f"fonte distorta: «{r['text']}»"
+        return 2, f"⚠️ fatto problematico, ma isolato: {cite(serious[0])}"
+    unjustified = [r for r in conclusions
+                   if r["verdict"] in ("Esagerata", "Contraddetta")
+                   or (r["verdict"] in UNVERIFIED and world(r) < 0.5) or world(r) < 0.15]
+    if unjustified:
+        label = "conclusione non giustificata dalle fonti" if len(unjustified) == 1 \
+            else "conclusioni non giustificate dalle fonti"
+        if len(unjustified) == 1:
+            return 2, f"⚠️ {label}: {cite(unjustified[0])}"
+        listed = "\n".join(f"⚠️ {cite(r)}" for r in unjustified)
+        return 2, f"{label}:\n{listed}"
+    # un fatto che Jev ritiene vero non è una distorsione, anche se l'estratto lo copre solo in parte
+    distorted = [r for r in facts if r["verdict"] == "Esagerata" and world(r) < 0.5]
+    if distorted:
+        label = "fonte distorta" if len(distorted) == 1 else "fonti distorte"
+        if len(distorted) == 1:
+            return 2, f"⚠️ {label}: {cite(distorted[0])}"
+        listed = "\n".join(f"⚠️ {cite(r)}" for r in distorted)
+        return 2, f"{label}:\n{listed}"
 
     # 3-5 stelle: quota di affermazioni confermate dalle fonti
     supported = [r for r in checked if r["verdict"] in SUPPORTED]

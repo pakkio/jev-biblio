@@ -15,7 +15,7 @@ Una verifica completa costa in media **0,1-0,2 ¢** e richiede **10-40 secondi**
 
 ## Avvio rapido
 
-Serve [uv](https://docs.astral.sh/uv/). Le dipendenze (`typesafe-sdk`, `python-dotenv`, `pypdf`) sono dichiarate in testa a `main.py` e uv le installa da solo.
+Serve [uv](https://docs.astral.sh/uv/). Le dipendenze (`typesafe-sdk`, `python-dotenv`, `pypdf`, `curl-cffi`) sono dichiarate in testa a `main.py` e uv le installa da solo.
 
 ```bash
 uv run main.py                      # apre http://127.0.0.1:8000/
@@ -42,7 +42,7 @@ Senza `OPENROUTER_API_KEY` la dashboard funziona in modalità ridotta: divide l'
 
 | Passaggio | Chi lo fa | Cosa succede |
 |---|---|---|
-| 1. Link e fonti | Python | Scarica in parallelo fino a 15 URL pubblici, con un tetto complessivo di 8 s; legge HTML, testo e PDF entro limiti di dimensione. |
+| 1. Link e fonti | Python | Scarica in parallelo fino a 15 URL pubblici, con un tetto complessivo di 8 s; legge HTML, testo e PDF entro limiti di dimensione. Usa `curl_cffi` per replicare l'handshake TLS di Chrome (alcuni siti dietro Cloudflare bloccano il fingerprint TLS di `urllib`/`requests` anche con header credibili); se non è installato, torna a `urllib`. |
 | 2. Estrazione | LLM (`gpt-6-luna`), a blocchi in parallelo se l'articolo supera ~2.200 caratteri | Divide il testo in affermazioni atomiche: **fatto**, **conclusione** dell'autore ("quindi", "dimostra che"), **opinione** o **esperienza** in prima persona. Per ognuna indica le fonti e le parole chiave in italiano e inglese. Temperatura 0, per essere il più possibile ripetibile. |
 | 3. Estratti | Python + Jev | Per ogni affermazione trova fino a 12 paragrafi candidati per fonte, per parole chiave e numeri confrontati per valore ("4.700" corrisponde a "4.7k"). Poi Jev, con una domanda sì/no per paragrafo in un'unica chiamata, sceglie quelli che servono davvero a confermare o smentire. |
 | 4. Verifica | Jev, una chiamata per affermazione, in parallelo | Decide se gli estratti sostengono l'affermazione, con quale confidenza, quanto è plausibile secondo la conoscenza generale e — solo se l'affermazione contiene numeri (date, quantità, misure) — se quei numeri corrispondono a quelli delle fonti. |
@@ -69,12 +69,16 @@ Le stelle non sono un giudizio complessivo "a sensazione": si calcolano dai verd
 
 La separazione tra premesse e conclusioni è ciò che distingue 1★ da 2★: il voto globale di Jev, da solo, dava 1★ a quasi tutti gli articoli fuorvianti.
 
+Il motivo (`rating_reason`) elenca **tutte** le affermazioni responsabili del voto, non solo la prima trovata: se un articolo ha più fatti gravemente problematici, o più conclusioni non giustificate, compaiono tutte, ciascuna con i numeri delle fonti citate (es. «affermazione» [1][3]).
+
 ### Verdetti per affermazione
+
+L'API espone il verdetto canonico in `verdict` (usato dalle regole di voto) e la versione mostrata in dashboard in `verdict_label`, identica tranne per "Parzialmente sostenuta".
 
 | Verdetto | Significato |
 |---|---|
 | Sostenuta | gli estratti dicono la stessa cosa |
-| Parzialmente sostenuta | il nucleo è confermato, alcuni dettagli non compaiono negli estratti |
+| Parzialmente sostenuta | il nucleo è confermato, alcuni dettagli non compaiono negli estratti. Mostrata come **Quasi sostenuta** (confidenza di Jev >75%), **Leggermente sostenuta** (50-75%) o **Vagamente sostenuta** (<50%) |
 | Esagerata | l'affermazione trae conclusioni o certezze che le fonti non danno |
 | Contraddetta | le fonti dicono il contrario |
 | Non trovata | gli estratti non trattano l'argomento |
@@ -172,14 +176,14 @@ Risposta (abbreviata):
   "external_check": {"requested": true, "message": "Riscontro esterno: non modifica il voto della bibliografia originale.", "sources": [], "checks": []},
   "claims": [
     {"text": "Lo specchio primario di Webb ha un diametro di 6,5 metri.", "kind": "fatto", "refs": ["2"],
-     "verdict": "Sostenuta", "confidence": 1.0, "world": 0.98, "decided_by": "Jev", "reason": "", "excerpts": {"2": "…"}}
+     "verdict": "Sostenuta", "verdict_label": "Sostenuta", "confidence": 1.0, "world": 0.98, "decided_by": "Jev", "reason": "", "excerpts": {"2": "…"}}
   ],
   "claim_counts": {"Sostenuta": 9, "Esagerata": 3, "Non trovata": 4},
   "relation": "Eccellente",
   "adherence": "Discrepanza parziale",
   "rating": "★★☆☆☆ Vero ma fuorviante",
   "rating_stars": 2,
-  "rating_reason": "conclusione non giustificata dalle fonti: «Il rilevamento di anidride carbonica … significa che Webb ha trovato un forte indizio di vita»",
+  "rating_reason": "conclusione non giustificata dalle fonti:\n⚠️ «Il rilevamento di anidride carbonica … significa che Webb ha trovato un forte indizio di vita» [2]",
   "rating_source": "regole",
   "rating_value": 2.31,
   "rating_confidence": 0.73,

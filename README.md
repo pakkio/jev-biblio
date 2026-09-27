@@ -12,7 +12,7 @@ Dashboard web locale che controlla se un articolo è davvero sostenuto dalle sue
 - **assegna da 1 a 5 stelle con regole esplicite** sui verdetti, mostrando il motivo, e **scrive una giustificazione in italiano**;
 - **mostra tempi e costi** di ogni passaggio, con il totale in centesimi.
 
-Una verifica completa costa in media **0,1-0,2 ¢** e richiede **10-40 secondi**, a seconda della lunghezza dell'articolo. Ultima esecuzione (settembre 2026): 100% sul set di test, 90% sul set di sviluppo (vedi [Valutazione](#valutazione) per i numeri completi, per la regressione del 27 settembre e per cosa significa ormai "test" — non è più un set indipendente).
+Una verifica completa costa in media **0,1-0,2 ¢** e richiede **10-40 secondi**, a seconda della lunghezza dell'articolo. Ultima esecuzione (settembre 2026): 100% sul set di test, 95% sul set di sviluppo (vedi [Valutazione](#valutazione) per i numeri completi, per la regressione del 27 settembre e per cosa significa ormai "test" — non è più un set indipendente).
 
 ## Avvio rapido
 
@@ -60,7 +60,7 @@ Opinioni ed esperienze personali non vengono verificate e non abbassano il voto.
 
 ### Controllo mirato sui numeri
 
-Quando un'affermazione contiene un numero abbastanza specifico da poter essere alterato (non un piccolo intero come "5 strati"), Jev riceve una domanda in più nella stessa chiamata: "gli estratti contengono lo stesso numero, o uno diverso?". Nei casi che ho provato a mano (data del lancio spostata di un giorno, altezza cambiata, annegati in un paragrafo lungo e per il resto corretto) la domanda principale di Jev intercettava già l'alterazione da sola con "Contraddetta"; il controllo sui numeri non ha ancora cambiato un verdetto nei test automatici. Resta comunque nella dashboard come segnale in più, a costo quasi nullo, e come rete di sicurezza per i casi in cui Jev giudicasse "Parzialmente sostenuta" un fatto con un numero sbagliato — un errore che le regole di voto (sotto) tratterebbero come falso.
+Quando un'affermazione contiene un numero abbastanza specifico da poter essere alterato (non un piccolo intero come "5 strati"), Jev riceve una domanda in più nella stessa chiamata, a tre vie: gli estratti riportano, per lo stesso soggetto specifico dell'affermazione, lo stesso numero (**Uguale**), un numero diverso (**Diverso**), o non ne parlano affatto (**Assente**, anche se contengono un numero diverso ma per un soggetto diverso o più specifico). Solo **Diverso** conta come alterazione nelle regole di voto (sotto); prima del 27 settembre 2026 era una domanda sì/no che confondeva "Diverso" e "Assente" in un solo "no", ed è per questo che un fatto vero su Webb (una temperatura generale degli strumenti, quando l'estratto scelto citava solo un componente specifico) veniva occasionalmente segnalato come "numero alterato" pur non essendolo.
 
 ### Regole di voto
 
@@ -127,14 +127,14 @@ Ogni esecuzione salva i dettagli in `eval/results/` con un timestamp, quindi un 
 
 Risultati di settembre 2026:
 
-| | Voto globale Jev (v1) | Per affermazione, voto Jev (v2) | Per affermazione + regole (v3) | v3 + estratti Jev, estrazione a blocchi, controllo numeri (v4) | bug del 27/9 pomeriggio (v4.5, prima della correzione sotto) | dopo la correzione del 27/9 (v5) | dopo controllo numeri per soggetto + link rot (v5.1) |
-|---|---|---|---|---|---|---|---|
-| Stelle esatte, sviluppo | 62% | 71% | 95% | 90-95%* | 81% (17/21) | 86% (18/21) | 90% (19/21) |
-| Entro una stella, sviluppo | — | — | — | — | 90% | 95% | 95% |
-| Stelle esatte, **test** | — | — | 100% | 100% | **89% (16/18)** | 100% (18/18) | 100% (18/18) |
-| Tempo medio, sviluppo | 5 s | 16,5 s | 14,4 s | 17,1 s | — | 12,4 s | 12,4 s |
-| Tempo medio, **articolo lungo** (~9.000 caratteri) | — | — | 20,8 s (estrazione) | **11,6 s** (estrazione, -44%) | — | — | — |
-| Costo medio, sviluppo | 0,019 ¢ | 0,196 ¢ | 0,202 ¢ | 0,225 ¢ | — | 0,222 ¢ | 0,234 ¢ |
+| | Voto globale Jev (v1) | Per affermazione, voto Jev (v2) | Per affermazione + regole (v3) | v3 + estratti Jev, estrazione a blocchi, controllo numeri (v4) | bug del 27/9 pomeriggio (v4.5, prima della correzione sotto) | dopo la correzione del 27/9 (v5) | controllo numeri per soggetto + link rot (v5.1) | numeri a 3 vie: Uguale/Diverso/Assente (v5.2) |
+|---|---|---|---|---|---|---|---|---|
+| Stelle esatte, sviluppo | 62% | 71% | 95% | 90-95%* | 81% (17/21) | 86% (18/21) | 90% (19/21) | **95% (20/21)** |
+| Entro una stella, sviluppo | — | — | — | — | 90% | 95% | 95% | 100% |
+| Stelle esatte, **test** | — | — | 100% | 100% | **89% (16/18)** | 100% (18/18) | 100% (18/18) | 100% (18/18) |
+| Tempo medio, sviluppo | 5 s | 16,5 s | 14,4 s | 17,1 s | — | 12,4 s | 12,4 s | 12,3 s |
+| Tempo medio, **articolo lungo** (~9.000 caratteri) | — | — | 20,8 s (estrazione) | **11,6 s** (estrazione, -44%) | — | — | — | — |
+| Costo medio, sviluppo | 0,019 ¢ | 0,196 ¢ | 0,202 ¢ | 0,225 ¢ | — | 0,222 ¢ | 0,234 ¢ | 0,231 ¢ |
 
 *\*Ho visto oscillare lo stesso articolo tra 3★ e 4★ da un'esecuzione all'altra (Grande muraglia, versione corretta): la selezione degli estratti fatta da Jev non è deterministica, quindi a volte sceglie un paragrafo diverso e il verdetto cambia. Non è una regressione di questa versione — l'ho verificato rilanciando lo stesso articolo tre volte.*
 
@@ -142,7 +142,9 @@ Risultati di settembre 2026:
 
 **Il 100% sul test, a questo punto, non è più un risultato su dati indipendenti.** Due dei tre casi che l'hanno riportato al 100% (`penicillina-false`, `titanic-misleading`) sono stati usati per scoprire e correggere il bug appena descritto: contano come accuratezza su dati già usati per tarare le regole, non come una valutazione alla cieca (vedi anche la nota sul set di test, sopra).
 
-**v5.1** ha corretto due falsi allarmi nuovi scoperti su `jwst-misleading` (era finito a 1★ invece di 2★): il controllo sui numeri ora chiede esplicitamente a Jev di confrontare il numero solo con lo stesso soggetto (una temperatura riferita "agli strumenti" in generale non è contraddetta da una temperatura diversa di un singolo componente citato a parte negli estratti); e un 404/410, o un DNS che non risolve più, viene ora ritentato su Wayback Machine prima di essere trattato come "citazione inventata" o fonte "Inaffidabile" — un link rotto (fonte vera, spostata o rimossa) non è la stessa cosa di una fonte mai esistita. `jwst-clean` resta un miss noto e non deterministico (oscilla tra 4★ e 2★ sullo stesso identico claim, la data di luglio 2022 dedotta ma non scritta nella fonte): i dettagli dei mismatch sono ora salvati nel JSON di valutazione (`eval/results/`), non solo il motivo testuale, per poterli rivedere.
+**v5.1** ha corretto due falsi allarmi nuovi scoperti su `jwst-misleading` (era finito a 1★ invece di 2★): il controllo sui numeri chiedeva a Jev di confrontare il numero solo con lo stesso soggetto (una temperatura riferita "agli strumenti" in generale non è contraddetta da una temperatura diversa di un singolo componente citato a parte negli estratti); e un 404/410, o un DNS che non risolve più, viene ora ritentato su Wayback Machine prima di essere trattato come "citazione inventata" o fonte "Inaffidabile" — un link rotto (fonte vera, spostata o rimossa) non è la stessa cosa di una fonte mai esistita.
+
+`jwst-clean` restava però un miss: non era rumore ma **un valore esattamente sul bordo della soglia**. Il JSON di valutazione (salvato per i mismatch da v5.1 in poi) mostrava `number_match` a una domanda sì/no e `world` a 0,64 contro una soglia di 0,65 — bastava un centesimo. La causa era la stessa domanda sì/no del controllo numeri: rispondeva "no" sia quando la fonte riportava un numero diverso, sia quando semplicemente non ne parlava (l'estratto scelto per "le operazioni sono iniziate a luglio 2022" diceva "dopo sei mesi", senza la data). **v5.2** trasforma quella domanda in una scelta a tre vie — Uguale / Diverso / Assente — e conta come alterazione solo "Diverso": lo stesso fatto ora risulta "Assente" in ogni run, e non tocca più la soglia. `jwst-clean` è passato a 4★ in 5 esecuzioni su 5.
 
 **Come leggerli:**
 - **Variabilità:** oltre al caso sopra, gli articoli fuorvianti al confine tra 1★ e 2★ possono cambiare risultato da un'esecuzione all'altra (es. Galileo fuorviante: 2★, 1★, 1★ su tre run; il telescopio Webb, versione corretta, ha oscillato tra 4★ e 2★ per lo stesso motivo — un singolo controllo sui numeri vicino alla soglia). L'estrazione del LLM a volte marca come "fatto" una parte di una conclusione.

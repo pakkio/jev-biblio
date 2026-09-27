@@ -798,15 +798,22 @@ WORLD_QUESTION = ("Indipendentemente dagli estratti, l'affermazione è vera seco
                   "e scientifiche consolidate? Se descrive un evento recente, tecnico o di nicchia che potresti "
                   "semplicemente non conoscere, non è automaticamente implausibile: rispondi 'implausibile' solo "
                   "se contraddice fatti consolidati o è internamente inverosimile, non solo perché non la riconosci.")
-NUMBER_QUESTION = ("L'affermazione contiene numeri (date, quantità, misure). Prima individua a quale "
-                   "soggetto specifico si riferisce ciascun numero (es. \"gli strumenti\" in generale, "
-                   "oppure un singolo componente o strumento citato a parte). Gli estratti contengono, "
-                   "per lo STESSO soggetto, lo stesso numero (con un arrotondamento normale, es. 8.849 "
-                   "e circa 8.850 contano uguali)? Se gli estratti riportano un numero diverso ma per un "
-                   "soggetto diverso o più specifico (es. la temperatura di un singolo strumento quando "
-                   "l'affermazione parla degli strumenti in generale), questo NON conta come un numero "
-                   "alterato: rispondi sì. Rispondi no solo se gli estratti danno un numero chiaramente "
-                   "diverso per lo stesso identico soggetto, o non contengono affatto quel numero.")
+NUMBER_QUESTION = ("L'affermazione contiene numeri (date, quantità, misure). Individua a quale soggetto "
+                   "specifico si riferisce ciascun numero (es. \"gli strumenti\" in generale, oppure un "
+                   "singolo componente o strumento citato a parte), poi confronta con gli estratti per "
+                   "quello stesso soggetto.")
+# "Diverso" ("l'estratto contraddice il numero") e "Assente" ("l'estratto non ne parla") sono
+# tenuti separati apposta: fondere i due casi in un unico "no" (come una domanda sì/no) nasconde
+# la differenza tra un fatto smentito e uno semplicemente non coperto dalla fonte, ed è quello
+# che faceva scattare altered_numbers su un estratto che non citava affatto quel dato.
+NUMBER_VERDICTS = {
+    "Uguale": "Gli estratti riportano, per lo stesso soggetto specifico dell'affermazione, lo stesso "
+              "numero (con un arrotondamento normale, es. 8.849 e circa 8.850 contano uguali).",
+    "Diverso": "Gli estratti riportano, per lo stesso identico soggetto, un numero chiaramente diverso.",
+    "Assente": "Gli estratti non contengono quel numero per quel soggetto specifico — anche se ne "
+               "contengono uno diverso, ma per un soggetto diverso o più specifico — oppure non "
+               "trattano affatto quel dato.",
+}
 
 
 def _has_checkable_numbers(text):
@@ -823,7 +830,7 @@ def _ask_jev(client, claim, sources, source_description="citate"):
     questions = {"world": Noul(instructions=WORLD_QUESTION)}
     check_numbers = sources and _has_checkable_numbers(claim["text"])
     if check_numbers:
-        questions["numbers"] = Noul(instructions=NUMBER_QUESTION)
+        questions["numbers"] = Choice(instructions=NUMBER_QUESTION, criteria=NUMBER_VERDICTS)
     if sources:
         questions["verdict"] = Choice(
             instructions=f"Gli estratti delle fonti {source_description} sostengono l'affermazione?",
@@ -836,7 +843,7 @@ def _ask_jev(client, claim, sources, source_description="citate"):
         "output_tokens": response.usage.output_tokens,
     }
     if check_numbers:
-        result["number_match"] = response.answers["numbers"].noul
+        result["number_match"] = response.answers["numbers"].choice
     if sources:
         answer = response.answers["verdict"]
         result.update(verdict=answer.choice, confidence=answer.confidence, probabilities=answer.probabilities)
@@ -1099,12 +1106,12 @@ def rate(rows, refs):
     # world() resta un secondo controllo: richiede che il verdetto (basato su un estratto reale)
     # sia corroborato dal giudizio generale, non che quel giudizio da solo crei una bandierina.
     contradicted = [r for r in facts if r["verdict"] == "Contraddetta" and world(r) < 0.5]
-    # Il segnale "numeri" risponde "no" sia quando la fonte riporta un numero diverso sia
-    # quando semplicemente non tratta quel dato: contarlo qui richiede che il verdetto indichi
-    # un disaccordo reale con la fonte, non solo la sua assenza (altrimenti è lo stesso segnale
-    # debole di "Non trovata" contato due volte).
+    # "number_match" distingue "Diverso" (l'estratto contraddice il numero) da "Assente" (l'estratto
+    # non ne parla, magari perché parla di un soggetto diverso o più specifico): solo "Diverso" è
+    # un'alterazione reale. Fondere i due in un singolo segnale, come faceva la vecchia domanda
+    # sì/no, faceva scattare la regola anche quando la fonte semplicemente non trattava quel dato.
     altered_numbers = [r for r in facts
-                        if r.get("number_match") is not None and r["number_match"] < 0.35 and world(r) < 0.65
+                        if r.get("number_match") == "Diverso" and world(r) < 0.65
                         and r["verdict"] not in UNVERIFIED]
     # Citazione probabilmente inventata: l'unica fonte citata non esiste (DNS, 404, 410 — non
     # semplicemente bloccata da anti-bot, vedi _source_likely_nonexistent) e l'affermazione è

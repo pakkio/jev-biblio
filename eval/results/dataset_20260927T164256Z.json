@@ -1,0 +1,377 @@
+[
+ {
+  "id": "apollo11-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 3.96,
+  "confidence": 0.76,
+  "counts": {
+   "Sostenuta": 4,
+   "Parzialmente sostenuta": 3,
+   "Non trovata": 2
+  },
+  "reason": "7 affermazioni su 9 confermate dalle fonti",
+  "seconds": 16.3,
+  "cents": 0.35640000000000005
+ },
+ {
+  "id": "apollo11-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.42,
+  "confidence": 0.65,
+  "counts": {
+   "Sostenuta": 3,
+   "Non trovata": 5
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «La quarantena degli astronauti dell’Apollo 11 dimostra che la NASA sapeva che sulla Luna esistevano microrganismi pericolosi.» [2]\n⚠️ «Michael Collins rimase in orbita perché non era ritenuto abbastanza affidabile per scendere sulla Luna.» [2]",
+  "seconds": 14.7,
+  "cents": 0.24286359999999999
+ },
+ {
+  "id": "apollo11-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 0.99,
+  "counts": {
+   "Non trovata": 1,
+   "Contraddetta": 4,
+   "Esagerata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «La missione Apollo 11 aveva un equipaggio di quattro astronauti.» [1]\n⚠️ «Buzz Aldrin fu il primo uomo a mettere piede sulla Luna.» [1][2]\n⚠️ «Michael Collins mise piede sulla Luna dopo Buzz Aldrin.» [1][2]\n⚠️ «Gli astronauti dell'Apollo 11 rimasero sulla superficie lunare per due settimane.» [2]",
+  "seconds": 11.8,
+  "cents": 0.2247924
+ },
+ {
+  "id": "curie-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.21,
+  "confidence": 0.71,
+  "counts": {
+   "Sostenuta": 7
+  },
+  "reason": "7 affermazioni su 7 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 7.8,
+  "cents": 0.142159
+ },
+ {
+  "id": "curie-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.94,
+  "confidence": 0.89,
+  "counts": {
+   "Sostenuta": 4,
+   "Non trovata": 1,
+   "Opinione": 1
+  },
+  "reason": "⚠️ conclusione non giustificata dalle fonti: «La morte di Marie Curie dimostra che la ricerca sulla radioattività è intrinsecamente mortale per chiunque la pratichi.» [1]",
+  "seconds": 7.2,
+  "cents": 0.1065112
+ },
+ {
+  "id": "curie-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.02,
+  "confidence": 0.99,
+  "counts": {
+   "Contraddetta": 4,
+   "Non trovata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Marie Curie nacque a Parigi nel 1880.» [1]\n⚠️ «Marie Curie vinse tre premi Nobel.» [2]\n⚠️ «Tutti e tre i premi Nobel vinti da Marie Curie furono per la fisica.» [2]\n⚠️ «La scoperta più importante di Marie Curie fu l'uranio.» [1][2]",
+  "seconds": 11.6,
+  "cents": 0.157557
+ },
+ {
+  "id": "pisa-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 3.83,
+  "confidence": 0.75,
+  "counts": {
+   "Sostenuta": 3,
+   "Parzialmente sostenuta": 4,
+   "Non trovata": 2
+  },
+  "reason": "7 affermazioni su 9 confermate dalle fonti",
+  "seconds": 17.9,
+  "cents": 0.5055852
+ },
+ {
+  "id": "pisa-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.67,
+  "confidence": 0.71,
+  "counts": {
+   "Sostenuta": 2,
+   "Senza fonte": 3
+  },
+  "reason": "⚠️ conclusione non giustificata dalle fonti: «Il problema della Torre di Pisa è risolto per sempre.»",
+  "seconds": 6.4,
+  "cents": 0.07494780000000001
+ },
+ {
+  "id": "pisa-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 0.99,
+  "counts": {
+   "Non trovata": 1,
+   "Contraddetta": 3,
+   "Esagerata": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «La Torre di Pisa fu costruita in soli cinque anni.» [1]\n⚠️ «La Torre di Pisa fu costruita dal 1350 al 1355.» [1]\n⚠️ «L'inclinazione della Torre di Pisa fu voluta dagli architetti per stupire i visitatori.» [2]",
+  "seconds": 11.1,
+  "cents": 0.1428868
+ },
+ {
+  "id": "muraglia-clean",
+  "expected": 4,
+  "got": 3,
+  "value": 3.47,
+  "confidence": 0.56,
+  "counts": {
+   "Non trovata": 2,
+   "Parzialmente sostenuta": 1,
+   "Sostenuta": 1
+  },
+  "reason": "solo 2 affermazioni su 4 confermate dalle fonti",
+  "seconds": 10.5,
+  "cents": 0.19427480000000003,
+  "claims": [
+   {
+    "text": "La Grande Muraglia cinese è un insieme di fortificazioni costruite nell'arco di molti secoli.",
+    "kind": "fatto",
+    "refs": [
+     "1"
+    ],
+    "verdict": "Non trovata",
+    "confidence": null,
+    "decided_by": "LLM",
+    "reason": "L'estratto riporta solo una citazione bibliografica e non afferma che la Grande Muraglia sia composta da fortificazioni costruite nel corso di molti secoli.",
+    "excerpts": {
+     "1": "1 2 3 4 (EN) Julia Lovell, The Great Wall: China against the world 1000 BC - 2000 AD, Sydney, Picador Pan Macmillan, 2006, pp. 15-21."
+    },
+    "world": 0.97,
+    "jev_verdict": "Non trovata",
+    "verdict_label": "Non trovata"
+   },
+   {
+    "text": "La maggior parte dei tratti oggi visibili della Grande Muraglia cinese risale alla dinastia Ming.",
+    "kind": "fatto",
+    "refs": [
+     "1",
+     "2"
+    ],
+    "verdict": "Parzialmente sostenuta",
+    "confidence": null,
+    "decided_by": "LLM",
+    "reason": "Le fonti indicano che i tratti più noti furono costruiti durante la dinastia Ming e quantificano la lunghezza della Grande Muraglia Ming, ma non affermano esplicitamente che la maggior parte dei tratti oggi visibili risalga a quel periodo.",
+    "excerpts": {
+     "1": "L'idea di una Grande Muraglia fu ripresa nuovamente durante la dinastia Ming nel XIV secolo, dopo la sconfitta dell'esercito Ming da parte degli Oirati, nella battaglia della Fortezza di Tumu. I Ming non erano riusciti a ottenere una vittoria chiara sulle tribù della Manciuria e della Mongolia dopo le battaglie successive, e il conflitto che ormai durava da lungo tempo stava indebolendo l'impero; i Ming adottarono una nuova strategia per tenere lontane le tribù nomadi: la costruzione di muri lungo il confine settentrionale della Cina. Riconoscendo il controllo mongolo stabilito nel deserto di Ordos, il muro seguì il bordo meridionale del deserto invece di incorporare la piegatura del Fiume G",
+     "2": "In 2012, based on existing research and the results of a comprehensive mapping survey, the National Cultural Heritage Administration of China concluded that the remaining Great Wall associated sites include 10,051 wall sections, 1,764 ramparts or trenches, 29,510 individual buildings, and 2,211 fortifications or passes, with the walls and trenches spanning a total length of 21,196.18 km (13,170.70 mi). It was further concluded that the Ming Great Wall measures 8,850 km (5,500 mi). This consists of 6,259 km (3,889 mi) of wall sections, 359 km (223 mi) of trenches and 2,232 km (1,387 mi) of natural defensive barriers such as hills and rivers. In addition, Qin, Han and earlier Great Wall sites \nTransporting the large quantity of materials required for construction was difficult, so builders always tried to use local resources; stone was used in montane areas, while rammed earth was used while building in the plains. There are no surviving historical records indicating the exact length and course of the Qin walls, as most of the ancient walls have eroded away over the centuries, and very few sections remain today. Later, the Han, the Northern dynasties and the Sui all repaired, rebuilt, or expanded sections of the Great Wall at great cost to defend themselves against northern invaders. The Tang and Song dynasties did not undertake any significant effort in the region. Dynasties foun\nThe Great Wall of China is a series of fortifications in China. They were built across the historical northern borders of ancient Chinese states and Imperial China as protection against various nomadic groups from the Eurasian Steppe. The first walls date to the 7th century BC; these were joined together in the Qin dynasty. Successive dynasties expanded the wall system; the best-known sections were built by the Ming dynasty (1368–1644)."
+    },
+    "world": 0.86,
+    "jev_verdict": "Parzialmente sostenuta",
+    "verdict_label": "Parzialmente sostenuta"
+   },
+   {
+    "text": "La Grande Muraglia cinese è stata dichiarata patrimonio dell'umanità dall'UNESCO nel 1987.",
+    "kind": "fatto",
+    "refs": [
+     "1"
+    ],
+    "verdict": "Sostenuta",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "1": "La Grande Muraglia (長城T, 长城S, ChángchéngP), nata come Wanli changcheng (萬里長城T, 万里长城S, Wànlǐ ChángchéngP, Grande Muraglia di 10 000 Lǐ), consiste in una lunghissima serie di mura situate nell'odierna Cina. È stata dichiarata dall'UNESCO patrimonio dell'umanità nel 1987 e inserita nel 2007 fra le sette meraviglie del mondo moderno."
+    },
+    "world": 0.97,
+    "number_match": "Uguale",
+    "jev_verdict": "Sostenuta",
+    "verdict_label": "Sostenuta"
+   },
+   {
+    "text": "La Grande Muraglia cinese non è visibile a occhio nudo dalla Luna.",
+    "kind": "fatto",
+    "refs": [
+     "2"
+    ],
+    "verdict": "Non trovata",
+    "confidence": 1.0,
+    "decided_by": "Jev",
+    "reason": "",
+    "excerpts": {
+     "2": ""
+    },
+    "world": 0.91,
+    "jev_verdict": "Non trovata",
+    "verdict_label": "Non trovata"
+   }
+  ]
+ },
+ {
+  "id": "muraglia-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.38,
+  "confidence": 0.68,
+  "counts": {
+   "Sostenuta": 1,
+   "Non trovata": 3
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «È confermato che la Grande Muraglia cinese è la costruzione umana più visibile dallo spazio.» [2]\n⚠️ «La Grande Muraglia cinese è riconoscibile anche dalla Luna.» [2]",
+  "seconds": 7.4,
+  "cents": 0.07692700000000001
+ },
+ {
+  "id": "muraglia-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.0,
+  "confidence": 1.0,
+  "counts": {
+   "Non trovata": 3,
+   "Contraddetta": 1
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «La Grande muraglia cinese è lunga esattamente 3.000 chilometri.» [1][2]",
+  "seconds": 13.6,
+  "cents": 0.1740766
+ },
+ {
+  "id": "fotosintesi-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.33,
+  "confidence": 0.54,
+  "counts": {
+   "Sostenuta": 5
+  },
+  "reason": "5 affermazioni su 5 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 7.6,
+  "cents": 0.1316222
+ },
+ {
+  "id": "fotosintesi-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.2,
+  "confidence": 0.83,
+  "counts": {
+   "Opinione": 1,
+   "Sostenuta": 1,
+   "Non trovata": 2,
+   "Esagerata": 1
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «La produzione di una parte importante dell'ossigeno atmosferico da parte del fitoplancton marino dimostra che le foreste non hanno alcun ruolo nel ciclo dell'ossigeno.» [2]\n⚠️ «La produzione di una parte importante dell'ossigeno atmosferico da parte del fitoplancton marino dimostra che disboscare le foreste non ha conseguenze sull'atmosfera.» [2]",
+  "seconds": 12.0,
+  "cents": 0.14364860000000002
+ },
+ {
+  "id": "fotosintesi-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.0,
+  "confidence": 1.0,
+  "counts": {
+   "Contraddetta": 6
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Durante la fotosintesi, le piante assorbono ossigeno.» [1]\n⚠️ «Durante la fotosintesi, le piante rilasciano anidride carbonica.» [1]\n⚠️ «La fotosintesi avviene nei mitocondri.» [2]\n⚠️ «La clorofilla si trova nei mitocondri.» [2]\n⚠️ «La fotosintesi può avvenire solo di notte.» [1][2]\n⚠️ «La fotosintesi avviene quando le piante sono al riparo dal sole.» [1][2]",
+  "seconds": 6.7,
+  "cents": 0.12684220000000002
+ },
+ {
+  "id": "python-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 4.69,
+  "confidence": 0.74,
+  "counts": {
+   "Sostenuta": 6
+  },
+  "reason": "6 affermazioni su 6 confermate dalle fonti (fonti solo enciclopediche: massimo 4 stelle)",
+  "seconds": 7.4,
+  "cents": 0.1275784
+ },
+ {
+  "id": "python-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 1.47,
+  "confidence": 0.6,
+  "counts": {
+   "Sostenuta": 2,
+   "Non trovata": 5
+  },
+  "reason": "conclusioni non giustificate dalle fonti:\n⚠️ «Python è il linguaggio più veloce in assoluto.» [2]\n⚠️ «Python è la scelta migliore per qualunque tipo di software.» [2]\n⚠️ «Python è la scelta migliore per sviluppare sistemi operativi.» [2]\n⚠️ «Python è la scelta migliore per sviluppare videogiochi.» [2]",
+  "seconds": 7.5,
+  "cents": 0.1268604
+ },
+ {
+  "id": "python-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.01,
+  "confidence": 1.0,
+  "counts": {
+   "Contraddetta": 4
+  },
+  "reason": "affermazione contraddetta dalla fonte e del tutto implausibile:\n⚠️ «Python fu creato da Dennis Ritchie ai Bell Labs nel 1972.» [1]\n⚠️ «Il nome Python fu scelto in onore del serpente pitone, simbolo di velocità.» [2]\n⚠️ «Python non usa l'indentazione.» [1][2]\n⚠️ «I blocchi in Python sono delimitati da parentesi graffe.» [1][2]",
+  "seconds": 13.0,
+  "cents": 0.1339912
+ },
+ {
+  "id": "jwst-clean",
+  "expected": 4,
+  "got": 4,
+  "value": 3.83,
+  "confidence": 0.8,
+  "counts": {
+   "Sostenuta": 13,
+   "Non trovata": 4,
+   "Parzialmente sostenuta": 3
+  },
+  "reason": "16 affermazioni su 20 confermate dalle fonti",
+  "seconds": 23.8,
+  "cents": 0.6120202
+ },
+ {
+  "id": "jwst-misleading",
+  "expected": 2,
+  "got": 2,
+  "value": 2.36,
+  "confidence": 0.67,
+  "counts": {
+   "Sostenuta": 12,
+   "Non trovata": 5,
+   "Esagerata": 1,
+   "Parzialmente sostenuta": 2
+  },
+  "reason": "⚠️ fonte distorta: «Lo scudo solare di Webb mantiene gli strumenti sotto i 50 kelvin.» [2][4]",
+  "seconds": 21.1,
+  "cents": 0.5550393
+ },
+ {
+  "id": "jwst-false",
+  "expected": 1,
+  "got": 1,
+  "value": 1.9,
+  "confidence": 0.77,
+  "counts": {
+   "Sostenuta": 11,
+   "Non trovata": 5,
+   "Parzialmente sostenuta": 2,
+   "Fonte irraggiungibile": 2
+  },
+  "reason": "più fatti gravemente problematici:\n⚠️ «Le osservazioni di Webb hanno dimostrato in modo definitivo che la teoria del Big Bang è sbagliata.» [5]\n⚠️ «Le osservazioni di Webb dimostrano che l'universo è almeno due volte più vecchio di quanto si pensasse.» [5]",
+  "seconds": 23.0,
+  "cents": 0.5022856
+ }
+]

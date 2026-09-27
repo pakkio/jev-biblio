@@ -606,8 +606,10 @@ html_code = """
                 const kind = c.kind === 'conclusione' ? '<span class="kind-conclusione">CONCLUSIONE</span> ' : '';
                 const world = c.world === undefined || c.world === null ? '' :
                     `<div class="text-muted" style="font-size:0.75rem;">plausibilità secondo Jev: ${Math.round(c.world * 100)}%</div>`;
-                const numbers = c.number_match === undefined || c.number_match === null ? '' :
-                    `<div class="text-muted" style="font-size:0.75rem;"><i class="bi bi-123"></i> numero confermato dalla fonte: ${Math.round(c.number_match * 100)}%</div>`;
+                const numberLabels = {Uguale: 'numero confermato dalla fonte',
+                    Diverso: 'la fonte riporta un numero diverso', Assente: 'la fonte non tratta questo numero'};
+                const numbers = c.number_match ? `<div class="text-muted" style="font-size:0.75rem;">` +
+                    `<i class="bi bi-123"></i> ${esc(numberLabels[c.number_match] || c.number_match)}</div>` : '';
                 tr.innerHTML = `<td>${i + 1}</td><td>${kind}${esc(c.text)}${reason}${world}${numbers}${details}</td>`
                     + `<td>${(c.refs || []).map(r => '[' + esc(r) + ']').join('')}</td>`
                     + `<td><span class="badge verdict-${esc(c.verdict).replace(/ /g, '-')}">${esc(c.verdict_label || c.verdict)}</span></td>`
